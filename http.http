@@ -37,7 +37,7 @@ $env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"
 go build -o build/docker/linux/amd64/octopus -ldflags="-s -w" -tags=jsoniter .
 
 # 4. 构建 Docker 镜像
-docker build -f scripts/dockerfiles/Dockerfile.alpine -t octopus:latest .
+docker build -f scripts/dockerfiles/Dockerfile.alpine -t jialtang/octopus:latest .
 
 
 
