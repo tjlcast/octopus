@@ -445,7 +445,8 @@
             "retryDetails": "Retry Details",
             "attempts": "attempts",
             "success": "Success",
-            "failed": "Failed"
+            "failed": "Failed",
+            "downloadMessages": "Download Messages"
         }
     },
     "channel": {

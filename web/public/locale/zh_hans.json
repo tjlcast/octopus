@@ -445,7 +445,8 @@
             "retryDetails": "重试详情",
             "attempts": "次尝试",
             "success": "成功",
-            "failed": "失败"
+            "failed": "失败",
+            "downloadMessages": "下载消息文件"
         }
     },
     "channel": {

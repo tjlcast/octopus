@@ -1,0 +1,34 @@
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer sk-octopus-k95arJ1Mm51jsHqJBBlg5gc47Zrj6uEy7aK9WYYiULm2WqSU" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "my",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "who are you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I am a chatbot."
+      }
+    ],
+    "temperature": 0.7,
+    "max_tokens": 1000,
+    "stream": true
+  }'
+
+
+
+
+
+
+
+pnpm run build ;
+
+
+Remove-Item "static/out" -Recurse -Force -ErrorAction SilentlyContinue; Copy-Item web/out static/ -Recurse; go run main.go start 

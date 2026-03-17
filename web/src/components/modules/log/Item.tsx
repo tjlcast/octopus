@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin } from 'lucide-react';
+import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, Download } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import JsonView from '@uiw/react-json-view';
@@ -24,6 +24,7 @@ import {
     useMorphingDialog,
 } from '@/components/ui/morphing-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/animate-ui/components/animate/tooltip';
+import JSZip from 'jszip';
 
 function formatTime(timestamp: number): string {
     const date = new Date(timestamp * 1000);
@@ -182,6 +183,209 @@ function DeferredJsonContent({ content, fallbackText }: { content: string | unde
             )}
         </AnimatePresence>
     );
+}
+
+interface MessageItem {
+    role?: string;
+    author?: string;
+    from?: string;
+    content?: unknown;
+    message?: string;
+    text?: string;
+    body?: string;
+}
+
+/**
+ * 从请求/响应内容中提取 messages 数组
+ */
+function extractMessages(content: string | undefined): MessageItem[] {
+    if (!content) return [];
+    
+    try {
+        const parsed = JSON.parse(content);
+        
+        // 直接查找 messages 字段
+        if (Array.isArray(parsed.messages)) {
+            return parsed.messages as MessageItem[];
+        }
+        
+        // 查找 input.messages
+        if (parsed.input && Array.isArray(parsed.input.messages)) {
+            return parsed.input.messages as MessageItem[];
+        }
+        
+        // 处理 OpenAI Chat Completion 格式：choices[{ message: { role, content } }]
+        if (Array.isArray(parsed.choices) && parsed.choices.length > 0) {
+            const choices = parsed.choices as Array<{
+                message?: { role?: string; content?: string | null };
+                delta?: { role?: string; content?: string | null };
+            }>;
+            
+            const messages: MessageItem[] = [];
+            for (const choice of choices) {
+                // 优先使用 message 字段（完整响应）
+                if (choice.message) {
+                    messages.push({
+                        role: choice.message.role || 'assistant',
+                        content: choice.message.content ?? ''
+                    });
+                }
+                // 或者使用 delta 字段（流式响应）
+                else if (choice.delta) {
+                    messages.push({
+                        role: choice.delta.role || 'assistant',
+                        content: choice.delta.content ?? ''
+                    });
+                }
+            }
+            if (messages.length > 0) {
+                return messages;
+            }
+        }
+        
+        // 递归搜索第一个看起来像 messages 的列表
+        function findMessages(obj: unknown): MessageItem[] | null {
+            if (Array.isArray(obj) && obj.length > 0) {
+                const hasRoleContent = obj.some(
+                    (item) => item && typeof item === 'object' && 
+                    ('role' in item || 'content' in item || 'author' in item)
+                );
+                if (hasRoleContent) return obj as MessageItem[];
+                
+                for (const item of obj) {
+                    const found = findMessages(item);
+                    if (found) return found;
+                }
+            } else if (obj && typeof obj === 'object') {
+                for (const key of Object.keys(obj)) {
+                    const found = findMessages((obj as Record<string, unknown>)[key]);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        const found = findMessages(parsed);
+        return found || [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * 清理角色名称中的不安全字符
+ */
+function sanitizeRole(role: string): string {
+    if (!role || typeof role !== 'string') return 'unknown';
+    const sanitized = role.replace(/[^0-9A-Za-z.-]+/g, '_');
+    return sanitized.substring(0, 64);
+}
+
+/**
+ * 提取消息的 content 字段
+ */
+function extractContent(message: MessageItem): string {
+    if (!message || typeof message !== 'object') return '';
+    
+    if ('content' in message) {
+        const content = message.content;
+        if (typeof content === 'string') return content;
+        
+        if (typeof content === 'object' && content !== null) {
+            // 尝试常见字段
+            if ('text' in content && typeof content.text === 'string') {
+                return content.text;
+            }
+            if ('parts' in content && Array.isArray(content.parts)) {
+                return content.parts.map((p: unknown) => String(p)).join('\n');
+            }
+            // 回退到 JSON 序列化
+            try {
+                return JSON.stringify(content, null, 2);
+            } catch {
+                return String(content);
+            }
+        }
+    }
+    
+    // 备选字段
+    for (const key of ['message', 'text', 'body']) {
+        if (key in message && typeof message[key as keyof MessageItem] === 'string') {
+            return message[key as keyof MessageItem] as string;
+        }
+    }
+    
+    return '';
+}
+
+/**
+ * 下载请求和响应消息为多个 markdown 文件
+ */
+async function downloadMessagesAsFiles(log: RelayLog) {
+    const zip = new JSZip();
+    
+    // 提取请求消息
+    const requestMessages = extractMessages(log.request_content);
+    // 提取响应消息
+    const responseMessages = extractMessages(log.response_content);
+    
+    let fileCount = 0;
+    
+    // 处理请求消息
+    requestMessages.forEach((msg, idx) => {
+        const role = msg.role || msg.author || msg.from || 'unknown';
+        const roleSafe = sanitizeRole(role);
+        const filename = `${idx + 1}_${roleSafe}.md`;
+        
+        let content = extractContent(msg);
+        if (!content) {
+            try {
+                content = JSON.stringify(msg, null, 2);
+            } catch {
+                content = String(msg);
+            }
+        }
+        
+        zip.file(`request_${filename}`, content);
+        fileCount++;
+    });
+    
+    // 处理响应消息
+    responseMessages.forEach((msg, idx) => {
+        const role = msg.role || msg.author || msg.from || 'unknown';
+        const roleSafe = sanitizeRole(role);
+        const filename = `${idx + 1}_${roleSafe}.md`;
+        
+        let content = extractContent(msg);
+        if (!content) {
+            try {
+                content = JSON.stringify(msg, null, 2);
+            } catch {
+                content = String(msg);
+            }
+        }
+        
+        zip.file(`response_${filename}`, content);
+        fileCount++;
+    });
+    
+    // 如果没有找到 messages，则使用原始内容
+    if (fileCount === 0) {
+        zip.file('request.md', log.request_content || '(无请求内容)');
+        zip.file('response.md', log.response_content || '(无响应内容)');
+        fileCount = 2;
+    }
+    
+    // 生成并下载 ZIP 文件
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `log_${log.id}_messages.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 
 export function LogCard({ log }: { log: RelayLog }) {
@@ -413,6 +617,16 @@ export function LogCard({ log }: { log: RelayLog }) {
                                     </div>
                                 )}
                                 <div className="flex-1 min-h-0 overflow-hidden">
+                                                                                                                                    <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        downloadMessagesAsFiles(log);
+                                                    }}
+                                                    className="p-1.5 rounded-lg hover:bg-muted/70 transition-colors group"
+                                                    title={t('downloadMessages')}
+                                                >
+                                                    <Download className="size-4 text-muted-foreground group-hover:text-primary" />
+                                                </button>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
                                         <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
                                             <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 border-b border-border bg-muted/50 shrink-0">
@@ -426,13 +640,23 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                 <DeferredJsonContent content={log.request_content} fallbackText={t('noRequestContent')} />
                                             </div>
                                         </div>
-                                        <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
+                                        <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0 relative">
                                             <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 border-b border-border bg-muted/50 shrink-0">
                                                 <MessageSquare className="size-4 text-purple-500" />
                                                 <span className="text-sm font-medium text-card-foreground">{t('responseContent')}</span>
                                                 <Badge variant="secondary" className="ml-auto text-xs">
                                                     {log.output_tokens.toLocaleString()} {t('tokens')}
                                                 </Badge>
+                                                {/* <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        downloadMessagesAsFiles(log);
+                                                    }}
+                                                    className="p-1.5 rounded-lg hover:bg-muted/70 transition-colors group"
+                                                    title={t('downloadMessages')}
+                                                >
+                                                    <Download className="size-4 text-muted-foreground group-hover:text-primary" />
+                                                </button> */}
                                             </div>
                                             <div className="flex-1 overflow-auto min-h-0">
                                                 <DeferredJsonContent content={log.response_content} fallbackText={t('noResponseContent')} />
