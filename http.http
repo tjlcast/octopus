@@ -40,8 +40,9 @@ go build -o build/docker/linux/amd64/octopus -ldflags="-s -w" -tags=jsoniter .
 docker build -f scripts/dockerfiles/Dockerfile.alpine -t jialtang/octopus:latest .
 
 
-
-
+# docker run
+docker run -d --name octopus-jialtang -v .\container\data:/app/data -p 8080:8080 jialtang/octopus:latest
+docker save -o Docker_jialtang-octopus_latest.tar.gz jialtang/octopus:latest
 
 
 pnpm run build ;
