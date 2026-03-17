@@ -25,6 +25,22 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 
 
 
+# 1. 编译前端
+cd web; pnpm install; $env:NEXT_PUBLIC_APP_VERSION="dev"; pnpm run build; cd ..
+Move-Item -Force web\out static\out
+
+# 2. 更新价格
+python3 scripts/updatePrice.py
+
+# 3. 编译 Go 后端
+$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"
+go build -o build/docker/linux/amd64/octopus -ldflags="-s -w" -tags=jsoniter .
+
+# 4. 构建 Docker 镜像
+docker build -f scripts/dockerfiles/Dockerfile.alpine -t octopus:latest .
+
+
+
 
 
 
