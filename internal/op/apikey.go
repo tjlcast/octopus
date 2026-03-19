@@ -50,6 +50,14 @@ func APIKeyGet(id int, ctx context.Context) (model.APIKey, error) {
 	return apiKey, nil
 }
 
+func APIKeyGetByDefaultKey(ctx context.Context) (model.APIKey, error) {
+	var key model.APIKey
+	if err := db.GetDB().WithContext(ctx).Where("name = ?", "default").First(&key).Error; err != nil {
+		return model.APIKey{}, fmt.Errorf("failed to get default API key: %w", err)
+	}
+	return key, nil
+}
+
 func APIKeyGetByAPIKey(apiKey string, ctx context.Context) (model.APIKey, error) {
 	id, ok := apiKeyIDMap.Get(apiKey)
 	if !ok {

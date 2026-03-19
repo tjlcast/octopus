@@ -43,6 +43,14 @@ func APIKeyAuth() gin.HandlerFunc {
 		}
 
 		if apiKey == "" {
+			apiKeyObj, err := op.APIKeyGetByDefaultKey(c.Request.Context())
+			if err == nil {
+				c.Set("request_type", requestType)
+				c.Set("supported_models", apiKeyObj.SupportedModels)
+				c.Set("api_key_id", apiKeyObj.ID)
+				c.Next()
+				return
+			}
 			resp.Error(c, http.StatusUnauthorized, resp.ErrUnauthorized)
 			c.Abort()
 			return
