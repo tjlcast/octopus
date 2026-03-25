@@ -50,6 +50,34 @@ curl -X POST http://121.40.102.152:8080/v1/chat/completions \
 
 
 
+
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer apple" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "my",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "who are you?"
+      },
+      {
+        "role": "assistant",
+        "content": "I am a chatbot."
+      }
+    ],
+    "temperature": 0.7,
+    "max_tokens": 1000,
+    "stream": true
+  }'
+
+
+
+
 # 1. 编译前端
 cd web; pnpm install; $env:NEXT_PUBLIC_APP_VERSION="dev"; pnpm run build; cd ..
 Move-Item -Force web\out static\out
