@@ -28,11 +28,11 @@ export function Log() {
     setIsClearing(true);
     clearLogs.mutate(undefined, {
       onSuccess: () => {
-        toast.success(t("log.clearSuccess"));
+        toast.success(tt("log.clearSuccess"));
         setIsClearing(false);
       },
       onError: () => {
-        toast.error(t("log.clearFailed"));
+        toast.error(tt("log.clearFailed"));
         setIsClearing(false);
       },
     });
