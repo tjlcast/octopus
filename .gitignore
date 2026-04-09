@@ -7,3 +7,4 @@ __debug_**
 .toco
 .vscode/toco*
 .idea/toco*
+**.tar.gz
