@@ -14,9 +14,39 @@
                 "start"
             ],
             "cwd": "${workspaceFolder}",
-            "env": {},
+            "env": {
+                "OCTOPUS_DEBUG": "true"
+            },
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "openOnSessionStart",
             "showLog": true,
             "trace": "verbose"
         },
+        {
+            "name": "Frontend Debug Next Dev",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "pnpm dev",
+            "cwd": "${workspaceFolder}/web",
+            "env": {
+                "OCTOPUS_API_BASE_URL": "http://localhost:8080"
+            },
+            "serverReadyAction": {
+                "pattern": "- Local:.+(https?://\\S+)",
+                "uriFormat": "%s",
+                "action": "debugWithChrome",
+                "webRoot": "${workspaceFolder}/web"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Stack Debug Octopus",
+            "configurations": [
+                "Backend Debug Octopus Start",
+                "Frontend Debug Next Dev"
+            ],
+            "stopAll": true
+        }
     ]
 }
