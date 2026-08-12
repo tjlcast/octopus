@@ -1,0 +1,166 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Build, release, and sync Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must match vX.X.X, got: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        shell: bash
+        run: echo "store_path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store_path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('web/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Generate changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          PREV_TAG="$(
+            git tag --sort=-version:refname \
+              | awk -v cur="${CURRENT_TAG}" '$0 == cur { getline; print; exit }'
+          )"
+
+          {
+            echo "## 更新日志"
+            echo
+            if [[ -n "${PREV_TAG}" ]]; then
+              echo "对比: \`${PREV_TAG}\` -> \`${CURRENT_TAG}\`"
+              echo
+              git log --pretty=format:'- %s (%h)' "${PREV_TAG}..${CURRENT_TAG}"
+            else
+              echo "首次发布"
+              echo
+              git log --pretty=format:'- %s (%h)' "${CURRENT_TAG}"
+            fi
+            echo
+          } > release-notes.md
+
+          cat release-notes.md
+
+      - name: Build and export Docker image
+        shell: bash
+        env:
+          IMAGE_NAME: jialtang/octopus
+          IMAGE_TAG: ${{ github.ref_name }}
+          VERSION: ${{ github.ref_name }}
+          TARGET_PLATFORM: linux/amd64
+          EXPORT_IMAGE: 'true'
+          ASSET_NAME: Docker-jialtang-octopus-${{ github.ref_name }}.tar.gz
+        run: |
+          set -euo pipefail
+
+          chmod +x scripts/build-docker.sh
+          scripts/build-docker.sh
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: octopus ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            Docker-jialtang-octopus-${{ github.ref_name }}.tar.gz
+          draft: false
+          prerelease: false
+
+      - name: Install sshpass
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      - name: Sync and deploy to Aliyun
+        shell: bash
+        env:
+          ALIYUN_IP: ${{ secrets.ALIYUN_IP }}
+          ALIYUN_USER: ${{ secrets.ALIYUN_USER }}
+          ALIYUN_PASSWORD: ${{ secrets.ALIYUN_PASSWORD }}
+          ALIYUN_PORT: ${{ secrets.ALIYUN_PORT }}
+          ALIYUN_REMOTE_DIR: ${{ secrets.ALIYUN_REMOTE_DIR }}
+          ALIYUN_DATA_DIR: ${{ secrets.ALIYUN_DATA_DIR }}
+          OCTOPUS_PORT: ${{ secrets.OCTOPUS_PORT }}
+          ASSET_NAME: Docker-jialtang-octopus-${{ github.ref_name }}.tar.gz
+          IMAGE_REF: jialtang/octopus:${{ github.ref_name }}
+          CONTAINER_NAME: octopus
+        run: |
+          set -euo pipefail
+
+          : "${ALIYUN_IP:?Missing GitHub secret: ALIYUN_IP}"
+          : "${ALIYUN_USER:?Missing GitHub secret: ALIYUN_USER}"
+          : "${ALIYUN_PASSWORD:?Missing GitHub secret: ALIYUN_PASSWORD}"
+
+          PORT="${ALIYUN_PORT:-22}"
+          REMOTE_DIR="${ALIYUN_REMOTE_DIR:-octopus-deploy}"
+          DATA_DIR="${ALIYUN_DATA_DIR:-${REMOTE_DIR}/data}"
+          APP_PORT="${OCTOPUS_PORT:-8080}"
+          SSH_OPTS="-p ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          SCP_OPTS="-P ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+          sshpass -p "${ALIYUN_PASSWORD}" ssh ${SSH_OPTS} \
+            "${ALIYUN_USER}@${ALIYUN_IP}" \
+            "mkdir -p '${REMOTE_DIR}' '${DATA_DIR}'"
+
+          sshpass -p "${ALIYUN_PASSWORD}" scp ${SCP_OPTS} \
+            "${ASSET_NAME}" \
+            "${ALIYUN_USER}@${ALIYUN_IP}:${REMOTE_DIR}/"
+
+          sshpass -p "${ALIYUN_PASSWORD}" ssh ${SSH_OPTS} \
+            "${ALIYUN_USER}@${ALIYUN_IP}" \
+            "cd '${REMOTE_DIR}' && \
+             gunzip -c '${ASSET_NAME}' | docker load && \
+             docker rm -f '${CONTAINER_NAME}' >/dev/null 2>&1 || true && \
+             docker run -d --name '${CONTAINER_NAME}' \
+               --restart unless-stopped \
+               -v '${DATA_DIR}:/app/data' \
+               -p '${APP_PORT}:8080' \
+               '${IMAGE_REF}'"
