@@ -70,14 +70,14 @@ jobs:
           )"
 
           {
-            echo "## 更新日志"
+            echo "## Changelog"
             echo
             if [[ -n "${PREV_TAG}" ]]; then
-              echo "对比: \`${PREV_TAG}\` -> \`${CURRENT_TAG}\`"
+              echo "Compare: \`${PREV_TAG}\` -> \`${CURRENT_TAG}\`"
               echo
               git log --pretty=format:'- %s (%h)' "${PREV_TAG}..${CURRENT_TAG}"
             else
-              echo "首次发布"
+              echo "First release"
               echo
               git log --pretty=format:'- %s (%h)' "${CURRENT_TAG}"
             fi
@@ -156,9 +156,10 @@ jobs:
 
           sshpass -p "${ALIYUN_PASSWORD}" ssh ${SSH_OPTS} \
             "${ALIYUN_USER}@${ALIYUN_IP}" \
-            "cd '${REMOTE_DIR}' && \
+            "set -e && \
+             cd '${REMOTE_DIR}' && \
              gunzip -c '${ASSET_NAME}' | docker load && \
-             docker rm -f '${CONTAINER_NAME}' >/dev/null 2>&1 || true && \
+             (docker rm -f '${CONTAINER_NAME}' >/dev/null 2>&1 || true) && \
              docker run -d --name '${CONTAINER_NAME}' \
                --restart unless-stopped \
                -v '${DATA_DIR}:/app/data' \
