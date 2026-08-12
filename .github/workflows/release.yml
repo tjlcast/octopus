@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    name: Build, release, and sync Docker image
+    name: Build and publish Docker image
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -110,58 +110,3 @@ jobs:
             Docker-jialtang-octopus-${{ github.ref_name }}.tar.gz
           draft: false
           prerelease: false
-
-      - name: Install sshpass
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          sudo apt-get update
-          sudo apt-get install -y sshpass
-
-      - name: Sync and deploy to Aliyun
-        shell: bash
-        env:
-          ALIYUN_IP: ${{ secrets.ALIYUN_IP }}
-          ALIYUN_USER: ${{ secrets.ALIYUN_USER }}
-          ALIYUN_PASSWORD: ${{ secrets.ALIYUN_PASSWORD }}
-          ALIYUN_PORT: ${{ secrets.ALIYUN_PORT }}
-          ALIYUN_REMOTE_DIR: ${{ secrets.ALIYUN_REMOTE_DIR }}
-          ALIYUN_DATA_DIR: ${{ secrets.ALIYUN_DATA_DIR }}
-          OCTOPUS_PORT: ${{ secrets.OCTOPUS_PORT }}
-          ASSET_NAME: Docker-jialtang-octopus-${{ github.ref_name }}.tar.gz
-          IMAGE_REF: jialtang/octopus:${{ github.ref_name }}
-          CONTAINER_NAME: octopus
-        run: |
-          set -euo pipefail
-
-          : "${ALIYUN_IP:?Missing GitHub secret: ALIYUN_IP}"
-          : "${ALIYUN_USER:?Missing GitHub secret: ALIYUN_USER}"
-          : "${ALIYUN_PASSWORD:?Missing GitHub secret: ALIYUN_PASSWORD}"
-
-          PORT="${ALIYUN_PORT:-22}"
-          REMOTE_DIR="${ALIYUN_REMOTE_DIR:-octopus-deploy}"
-          DATA_DIR="${ALIYUN_DATA_DIR:-${REMOTE_DIR}/data}"
-          APP_PORT="${OCTOPUS_PORT:-8080}"
-          SSH_OPTS="-p ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          SCP_OPTS="-P ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-
-          sshpass -p "${ALIYUN_PASSWORD}" ssh ${SSH_OPTS} \
-            "${ALIYUN_USER}@${ALIYUN_IP}" \
-            "mkdir -p '${REMOTE_DIR}' '${DATA_DIR}'"
-
-          sshpass -p "${ALIYUN_PASSWORD}" scp ${SCP_OPTS} \
-            "${ASSET_NAME}" \
-            "${ALIYUN_USER}@${ALIYUN_IP}:${REMOTE_DIR}/"
-
-          sshpass -p "${ALIYUN_PASSWORD}" ssh ${SSH_OPTS} \
-            "${ALIYUN_USER}@${ALIYUN_IP}" \
-            "set -e && \
-             cd '${REMOTE_DIR}' && \
-             gunzip -c '${ASSET_NAME}' | docker load && \
-             (docker rm -f '${CONTAINER_NAME}' >/dev/null 2>&1 || true) && \
-             docker run -d --name '${CONTAINER_NAME}' \
-               --restart unless-stopped \
-               -v '${DATA_DIR}:/app/data' \
-               -p '${APP_PORT}:8080' \
-               '${IMAGE_REF}'"

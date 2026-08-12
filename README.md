@@ -42,6 +42,44 @@ wget https://raw.githubusercontent.com/bestruirui/octopus/refs/heads/dev/docker-
 docker compose up -d
 ```
 
+Build the Docker image locally:
+
+PowerShell:
+
+```powershell
+.\scripts\build-docker.ps1
+```
+
+Bash:
+
+```bash
+./scripts/build-docker.sh
+```
+
+The default image is `jialtang/octopus:latest` for `linux/amd64`. The script builds the frontend, moves `web/out` to `static/out`, updates price data, builds the Go backend, and then builds the Docker image with `scripts/dockerfiles/Dockerfile.alpine`.
+
+Specify image name and tag:
+
+```powershell
+.\scripts\build-docker.ps1 -ImageName "jialtang/octopus" -ImageTag "v1.0.0"
+```
+
+```bash
+IMAGE_NAME=jialtang/octopus IMAGE_TAG=v1.0.0 ./scripts/build-docker.sh
+```
+
+Export the image as a gzip archive:
+
+```powershell
+.\scripts\build-docker.ps1 -ImageTag "v1.0.0" -ExportImage
+```
+
+```bash
+IMAGE_TAG=v1.0.0 EXPORT_IMAGE=true ./scripts/build-docker.sh
+```
+
+This creates `Docker-jialtang-octopus-v1.0.0.tar.gz`.
+
 
 ### 📦 Download from Release
 
@@ -372,4 +410,3 @@ Edit `~/.codex/auth.json`
 
 - 🙏 [looplj/axonhub](https://github.com/looplj/axonhub) - The LLM API adaptation module in this project is directly derived from this repository
 - 📊 [sst/models.dev](https://github.com/sst/models.dev) - AI model database providing model pricing data
-

@@ -42,6 +42,44 @@ wget https://raw.githubusercontent.com/bestruirui/octopus/refs/heads/dev/docker-
 docker compose up -d
 ```
 
+本地构建 Docker 镜像：
+
+PowerShell：
+
+```powershell
+.\scripts\build-docker.ps1
+```
+
+Bash：
+
+```bash
+./scripts/build-docker.sh
+```
+
+默认构建 `linux/amd64` 平台的 `jialtang/octopus:latest`。脚本会依次构建前端、把 `web/out` 移动到 `static/out`、更新价格数据、构建 Go 后端，然后使用 `scripts/dockerfiles/Dockerfile.alpine` 构建 Docker 镜像。
+
+指定镜像名和 tag：
+
+```powershell
+.\scripts\build-docker.ps1 -ImageName "jialtang/octopus" -ImageTag "v1.0.0"
+```
+
+```bash
+IMAGE_NAME=jialtang/octopus IMAGE_TAG=v1.0.0 ./scripts/build-docker.sh
+```
+
+导出 gzip 压缩后的镜像文件：
+
+```powershell
+.\scripts\build-docker.ps1 -ImageTag "v1.0.0" -ExportImage
+```
+
+```bash
+IMAGE_TAG=v1.0.0 EXPORT_IMAGE=true ./scripts/build-docker.sh
+```
+
+会生成 `Docker-jialtang-octopus-v1.0.0.tar.gz`。
+
 
 ### 📦 从 Release 下载
 

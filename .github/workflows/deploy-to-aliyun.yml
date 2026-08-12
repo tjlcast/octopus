@@ -1,0 +1,125 @@
+name: Deploy to Aliyun
+
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  deploy:
+    name: Build and deploy Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare build metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SHORT_SHA="${GITHUB_SHA::7}"
+          VERSION="deploy-${SHORT_SHA}"
+
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "docker_asset=Docker-jialtang-octopus-${VERSION}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        shell: bash
+        run: echo "store_path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store_path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('web/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Build and export Docker image
+        shell: bash
+        env:
+          IMAGE_NAME: jialtang/octopus
+          IMAGE_TAG: ${{ steps.meta.outputs.version }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          TARGET_PLATFORM: linux/amd64
+          EXPORT_IMAGE: 'true'
+          ASSET_NAME: ${{ steps.meta.outputs.docker_asset }}
+        run: |
+          set -euo pipefail
+
+          chmod +x scripts/build-docker.sh
+          scripts/build-docker.sh
+
+      - name: Install sshpass
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      - name: Upload artifacts to Aliyun
+        shell: bash
+        env:
+          ALIYUN_IP: ${{ secrets.ALIYUN_IP }}
+          ALIYUN_USER: ${{ secrets.ALIYUN_USER }}
+          ALIYUN_PASSWORD: ${{ secrets.ALIYUN_PASSWORD }}
+          ALIYUN_PORT: ${{ secrets.ALIYUN_PORT }}
+          ALIYUN_REMOTE_DIR: ${{ secrets.ALIYUN_REMOTE_DIR }}
+          OCTOPUS_CONTAINER_NAME: ${{ secrets.OCTOPUS_CONTAINER_NAME }}
+          OCTOPUS_HOST_PORT: ${{ secrets.OCTOPUS_HOST_PORT }}
+          OCTOPUS_DATA_DIR: ${{ secrets.OCTOPUS_DATA_DIR }}
+        run: |
+          set -euo pipefail
+
+          : "${ALIYUN_IP:?Missing GitHub secret: ALIYUN_IP}"
+          : "${ALIYUN_USER:?Missing GitHub secret: ALIYUN_USER}"
+          : "${ALIYUN_PASSWORD:?Missing GitHub secret: ALIYUN_PASSWORD}"
+
+          PORT="${ALIYUN_PORT:-22}"
+          REMOTE_DIR="${ALIYUN_REMOTE_DIR:-octopus-deploy}"
+          CONTAINER_NAME="${OCTOPUS_CONTAINER_NAME:-octopus}"
+          HOST_PORT="${OCTOPUS_HOST_PORT:-8080}"
+          DATA_DIR="${OCTOPUS_DATA_DIR:-octopus-data}"
+          SSH_OPTS="-p ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          SCP_OPTS="-P ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+          sshpass -p "${ALIYUN_PASSWORD}" ssh ${SSH_OPTS} \
+            "${ALIYUN_USER}@${ALIYUN_IP}" \
+            "mkdir -p '${REMOTE_DIR}'"
+
+          sshpass -p "${ALIYUN_PASSWORD}" scp ${SCP_OPTS} \
+            "${{ steps.meta.outputs.docker_asset }}" \
+            "${ALIYUN_USER}@${ALIYUN_IP}:${REMOTE_DIR}/"
+
+          sshpass -p "${ALIYUN_PASSWORD}" scp ${SCP_OPTS} \
+            deploy.sh \
+            "${ALIYUN_USER}@${ALIYUN_IP}:${REMOTE_DIR}/"
+
+          sshpass -p "${ALIYUN_PASSWORD}" ssh ${SSH_OPTS} \
+            "${ALIYUN_USER}@${ALIYUN_IP}" \
+            "cd '${REMOTE_DIR}' && chmod +x deploy.sh && CONTAINER_NAME='${CONTAINER_NAME}' HOST_PORT='${HOST_PORT}' DATA_DIR='${DATA_DIR}' ./deploy.sh"

@@ -21,18 +21,9 @@ case "${TARGET_PLATFORM}" in
 esac
 
 VERSION="${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo dev)}"
-COMMIT_ID="${COMMIT_ID:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}"
-BUILD_TIME="${BUILD_TIME:-$(TZ=Asia/Shanghai date '+%F %T %z')}"
-AUTHOR="${AUTHOR:-bestrui}"
 IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
 SAFE_IMAGE_NAME="${IMAGE_NAME//\//-}"
 ASSET_NAME="${ASSET_NAME:-Docker-${SAFE_IMAGE_NAME}-${IMAGE_TAG}.tar.gz}"
-
-LDFLAGS="-X 'github.com/bestruirui/octopus/internal/conf.Version=${VERSION}' \
--X 'github.com/bestruirui/octopus/internal/conf.BuildTime=${BUILD_TIME}' \
--X 'github.com/bestruirui/octopus/internal/conf.Author=${AUTHOR}' \
--X 'github.com/bestruirui/octopus/internal/conf.Commit=${COMMIT_ID}' \
--s -w"
 
 echo "Building frontend..."
 (
@@ -45,18 +36,18 @@ rm -rf static/out
 mv web/out static/out
 
 echo "Updating price data..."
-python3 scripts/updatePrice.py
+# python3 scripts/updatePrice.py
 
 echo "Building Go backend for ${TARGET_PLATFORM}..."
 mkdir -p "${OUTPUT_DIR}/docker/${TARGET_PLATFORM}"
 if [[ -n "${GOARM:-}" ]]; then
   GOOS="${GOOS}" GOARCH="${GOARCH}" GOARM="${GOARM}" CGO_ENABLED=0 \
     go build -o "${OUTPUT_DIR}/docker/${TARGET_PLATFORM}/${APP_NAME}" \
-      -ldflags="${LDFLAGS}" -tags=jsoniter .
+      -ldflags="-s -w" -tags=jsoniter .
 else
   GOOS="${GOOS}" GOARCH="${GOARCH}" CGO_ENABLED=0 \
     go build -o "${OUTPUT_DIR}/docker/${TARGET_PLATFORM}/${APP_NAME}" \
-      -ldflags="${LDFLAGS}" -tags=jsoniter .
+      -ldflags="-s -w" -tags=jsoniter .
 fi
 
 echo "Building Docker image ${IMAGE_REF}..."

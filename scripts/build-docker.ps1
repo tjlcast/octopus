@@ -25,25 +25,9 @@ $Version = if ($env:VERSION) { $env:VERSION } else {
     $tag = git describe --tags --abbrev=0 2>$null
     if ($LASTEXITCODE -eq 0 -and $tag) { $tag } else { "dev" }
 }
-$CommitId = if ($env:COMMIT_ID) { $env:COMMIT_ID } else {
-    $commit = git rev-parse --short HEAD 2>$null
-    if ($LASTEXITCODE -eq 0 -and $commit) { $commit } else { "unknown" }
-}
-$BuildTime = if ($env:BUILD_TIME) {
-    $env:BUILD_TIME
-} else {
-    [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::Now, "China Standard Time").ToString("yyyy-MM-dd HH:mm:ss zzz")
-}
-$Author = if ($env:AUTHOR) { $env:AUTHOR } else { "bestrui" }
 $ImageRef = "${ImageName}:${ImageTag}"
 $SafeImageName = $ImageName -replace "/", "-"
 $AssetName = if ($env:ASSET_NAME) { $env:ASSET_NAME } else { "Docker-${SafeImageName}-${ImageTag}.tar.gz" }
-
-$Ldflags = "-X `"github.com/bestruirui/octopus/internal/conf.Version=$Version`" " +
-    "-X `"github.com/bestruirui/octopus/internal/conf.BuildTime=$BuildTime`" " +
-    "-X `"github.com/bestruirui/octopus/internal/conf.Author=$Author`" " +
-    "-X `"github.com/bestruirui/octopus/internal/conf.Commit=$CommitId`" " +
-    "-s -w"
 
 Write-Host "Building frontend..."
 Push-Location web
@@ -56,7 +40,7 @@ Remove-Item "static/out" -Recurse -Force -ErrorAction SilentlyContinue
 Move-Item -Force "web/out" "static/out"
 
 Write-Host "Updating price data..."
-python scripts/updatePrice.py
+# python scripts/updatePrice.py
 
 Write-Host "Building Go backend for $TargetPlatform..."
 $BinaryDir = Join-Path $OutputDir "docker/$TargetPlatform"
@@ -70,7 +54,7 @@ if ($goArm) {
 } else {
     Remove-Item Env:\GOARM -ErrorAction SilentlyContinue
 }
-go build -o (Join-Path $BinaryDir "octopus") -ldflags="$Ldflags" -tags=jsoniter .
+go build -o (Join-Path $BinaryDir "octopus") -ldflags="-s -w" -tags=jsoniter .
 
 Write-Host "Building Docker image $ImageRef..."
 docker build `

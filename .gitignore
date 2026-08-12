@@ -8,3 +8,5 @@ __debug_**
 .vscode/toco*
 .idea/toco*
 **.tar.gz
+*.tar
+*.tmp
