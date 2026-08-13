@@ -1,7 +1,11 @@
 {
-    // 使用 IntelliSense 了解相关属性。 
-    // 悬停以查看现有属性的描述。
-    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    // VS Code debug configurations for local development.
+    // The full-stack compound follows README_zh.md "Development Mode":
+    // - frontend: cd web && pnpm install && NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8080" pnpm run dev
+    // - backend: go run main.go start
+    //
+    // Environment variables are set through VS Code "env" so the configuration
+    // works across macOS, Windows, and Linux shells.
     "version": "0.2.0",
     "configurations": [
         {
@@ -26,10 +30,14 @@
             "name": "Frontend Debug Next Dev",
             "type": "node-terminal",
             "request": "launch",
-            "command": "pnpm dev",
+            "command": "pnpm install && pnpm run dev",
+            "windows": {
+                "command": "cmd /d /c \"pnpm install && pnpm run dev\""
+            },
             "cwd": "${workspaceFolder}/web",
             "env": {
-                "OCTOPUS_API_BASE_URL": "http://localhost:8080"
+                "NEXT_PUBLIC_API_BASE_URL": "http://127.0.0.1:8080",
+                "OCTOPUS_API_BASE_URL": "http://127.0.0.1:8080"
             },
             "serverReadyAction": {
                 "pattern": "- Local:.+(https?://\\S+)",
