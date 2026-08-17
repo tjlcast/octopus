@@ -101,6 +101,37 @@ jobs:
           chmod +x scripts/build-docker.sh
           scripts/build-docker.sh
 
+      - name: Install makeself
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y makeself
+
+      - name: Package self-extracting installer
+        shell: bash
+        env:
+          ASSET_NAME: Docker-jialtang-octopus-${{ github.ref_name }}.tar.gz
+          INSTALLER_NAME: octopus-${{ github.ref_name }}-install.run
+        run: |
+          set -euo pipefail
+
+          image_tar="${ASSET_NAME%.gz}"
+
+          # 解压出裸 .tar 供 makeself 打包，同时保留 .tar.gz 用于发布
+          gzip -dkf "${ASSET_NAME}"
+
+          rm -rf payload
+          mkdir -p payload
+          cp scripts/installer.sh payload/installer.sh
+          chmod +x payload/installer.sh
+          mv "${image_tar}" payload/
+
+          makeself payload/ "${INSTALLER_NAME}" "Octopus Deploy Installer" ./installer.sh
+
+          ls -lh "${INSTALLER_NAME}"
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -108,5 +139,6 @@ jobs:
           body_path: release-notes.md
           files: |
             Docker-jialtang-octopus-${{ github.ref_name }}.tar.gz
+            octopus-${{ github.ref_name }}-install.run
           draft: false
           prerelease: false
