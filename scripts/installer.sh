@@ -2,12 +2,12 @@
 set -e
 
 # ========== 默认配置（可通过环境变量覆盖） ==========
-: "${HOST_PORT:=5000}"               # 主机映射端口，默认 5000
-: "${CONTAINER_PORT:=5000}"          # 容器内部端口（请根据镜像实际监听端口修改）
+: "${HOST_PORT:=8080}"               # 主机映射端口，默认 8080
+: "${CONTAINER_PORT:=8080}"          # 容器内部端口（请根据镜像实际监听端口修改）
 : "${DATA_DIR:=$HOME/.octopus-deploy/data}"  # 数据目录，默认固定在用户家目录下，不依赖调用位置
 : "${CONTAINER_NAME:=octopus-app}"   # 容器名称，固定
 
-# ========== 颜色输出 ==========
+# ========== 颜色输出 ==========q
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -25,8 +25,8 @@ Octopus Deploy 安装程序
     -h, --help     显示此帮助信息并退出
 
 环境变量（用于覆盖默认配置）:
-    HOST_PORT       主机映射端口（默认: 5000）
-    CONTAINER_PORT  容器内部端口（默认: 5000，请根据镜像实际端口修改）
+    HOST_PORT       主机映射端口（默认: 8080）
+    CONTAINER_PORT  容器内部端口（默认: 8080，请根据镜像实际端口修改）
     DATA_DIR        数据目录，强烈建议传绝对路径（默认: \$HOME/.octopus-deploy/data）
     CONTAINER_NAME  容器名称（默认: octopus-app）
 
@@ -45,6 +45,12 @@ Octopus Deploy 安装程序
 
     # 保留临时解压目录（调试用，makeself 自带参数）
     ./octopus-installer.run --keep
+
+    # 例举.run中的文件
+    ./octopus-installer.run --list
+
+    # 解压.run中的文件内容
+    ./octopus-installer.run --tar xvf
 
     # sample
     HOST_PORT=8081 DATA_DIR="\$(pwd)/octopus-data" ./octopus-installer.run
