@@ -255,6 +255,11 @@ func (ra *relayAttempt) forward() (int, error) {
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	if err := ra.applyParamOverride(outboundRequest); err != nil {
+		log.Warnf("failed to apply param override: %v", err)
+		return 0, fmt.Errorf("failed to apply param override: %w", err)
+	}
+
 	// 复制请求头
 	ra.copyHeaders(outboundRequest)
 
