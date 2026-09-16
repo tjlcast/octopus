@@ -51,11 +51,11 @@ curl -X POST http://121.40.102.152:8080/v1/chat/completions \
 
 
 
+```bash
 curl -X POST http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer apple1" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "my",
+    "model": "chat",
     "messages": [
       {
         "role": "system",
@@ -75,6 +75,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
     "stream": true
   }'
 
+```
 
 
 

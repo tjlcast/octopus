@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, Download } from 'lucide-react';
+import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, Download, Network } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import JsonView from '@uiw/react-json-view';
@@ -438,10 +438,16 @@ export function LogCard({ log }: { log: RelayLog }) {
                                     <Pin className="size-3.5 shrink-0 text-amber-500" />
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-6 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
+                            <div className="grid grid-cols-2 md:grid-cols-7 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="size-3.5 shrink-0" style={{ color: brandColor }} />
                                     <span>{formatTime(log.time)}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <Network className="size-3.5 shrink-0 text-cyan-500" />
+                                    <span className="truncate" title={log.client_ip || '-'}>
+                                        IP {log.client_ip || '-'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <Zap className="size-3.5 shrink-0 text-amber-500" />
@@ -671,6 +677,12 @@ export function LogCard({ log }: { log: RelayLog }) {
                             <div className="flex items-center gap-1.5">
                                 <Clock className="size-3.5" style={{ color: brandColor }} />
                                 <span className="tabular-nums">{formatTime(log.time)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <Network className="size-3.5 text-cyan-500" />
+                                <span className="tabular-nums truncate" title={log.client_ip || '-'}>
+                                    IP: {log.client_ip || '-'}
+                                </span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <Zap className="size-3.5 text-amber-500" />

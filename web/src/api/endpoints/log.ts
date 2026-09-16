@@ -29,6 +29,7 @@ export interface ChannelAttempt {
  */
 export interface RelayLog {
     id: number;
+    client_ip?: string;          // Client IP
     time: number;                // 时间戳
     request_model_name: string;  // 请求模型名称
     channel: number;             // 实际使用的渠道ID
