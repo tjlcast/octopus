@@ -13,6 +13,7 @@ import (
 func init() {
 	router.NewGroupRouter("/v1").
 		Use(middleware.APIKeyAuth()).
+		Use(middleware.TrafficControl()).
 		Use(middleware.RequireJSON()).
 		AddRoute(
 			router.NewRoute("/chat/completions", http.MethodPost).
