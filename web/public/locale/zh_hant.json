@@ -213,6 +213,10 @@
             "loadFailed": "載入失敗",
             "form": {
                 "name": "名稱",
+                "key": "金鑰",
+                "showKey": "顯示金鑰",
+                "hideKey": "隱藏金鑰",
+                "keyChangeConfirm": "金鑰已修改，再次點擊確認儲存。",
                 "maxCost": "最大金額",
                 "maxCostPlaceholder": "請輸入金額",
                 "unlimited": "無限制",

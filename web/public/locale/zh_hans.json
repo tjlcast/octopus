@@ -213,6 +213,10 @@
             "loadFailed": "加载失败",
             "form": {
                 "name": "名称",
+                "key": "密钥",
+                "showKey": "显示密钥",
+                "hideKey": "隐藏密钥",
+                "keyChangeConfirm": "密钥已修改，再次点击确认保存。",
                 "maxCost": "最大金额",
                 "maxCostPlaceholder": "请输入金额",
                 "unlimited": "无限制",

@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { KeyRound, Plus, Loader, Trash2, Check, X, Info, CalendarDays, Pencil, Maximize2 } from 'lucide-react';
+import { KeyRound, Plus, Loader, Trash2, Check, X, Info, CalendarDays, Pencil, Maximize2, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
@@ -75,7 +75,7 @@ interface APIKeyFormProps {
     apiKey?: APIKey;
     isPending: boolean;
     submitLabel: string;
-    onSubmit: (data: Omit<APIKey, 'id' | 'api_key'>) => void;
+    onSubmit: (data: Omit<APIKey, 'id' | 'api_key'> & { api_key?: string }) => void;
     onClose: () => void;
 }
 
@@ -83,8 +83,9 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
     const t = useTranslations('setting');
     const { data: groups = [] } = useGroupList();
 
-    const [form, setForm] = useState<Omit<APIKey, 'id' | 'api_key'>>(() => ({
+    const [form, setForm] = useState<Omit<APIKey, 'id' | 'api_key'> & { api_key?: string }>(() => ({
         name: apiKey?.name ?? '',
+        api_key: apiKey?.api_key ?? '',
         enabled: apiKey?.enabled ?? true,
         expire_at: apiKey?.expire_at,
         max_cost: apiKey?.max_cost,
@@ -103,6 +104,8 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
         return '00:00';
     });
     const [expireOpen, setExpireOpen] = useState(false);
+    const [showAPIKey, setShowAPIKey] = useState(false);
+    const [confirmKeyChange, setConfirmKeyChange] = useState(false);
 
     const availableModels = useMemo(() => {
         const names = groups.map((g) => g.name).filter(Boolean);
@@ -119,8 +122,11 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
             ? expireDate.toLocaleDateString()
             : t('apiKey.form.selectDate');
 
-    const updateForm = useCallback((updater: Partial<Omit<APIKey, 'id' | 'api_key'>>) => {
+    const updateForm = useCallback((updater: Partial<Omit<APIKey, 'id' | 'api_key'> & { api_key?: string }>) => {
         setForm((prev) => ({ ...prev, ...updater }));
+        if ('api_key' in updater) {
+            setConfirmKeyChange(false);
+        }
     }, []);
 
     const handleSelectDate = useCallback((d: Date | undefined) => {
@@ -163,8 +169,12 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
     const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         if (!form.name.trim()) return;
+        if (apiKey && form.api_key !== apiKey.api_key && !confirmKeyChange) {
+            setConfirmKeyChange(true);
+            return;
+        }
         onSubmit(form);
-    }, [form, onSubmit]);
+    }, [apiKey, confirmKeyChange, form, onSubmit]);
 
     return (
         <form onSubmit={handleSubmit} className="grid gap-2">
@@ -179,6 +189,37 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
                     required
                 />
             </label>
+
+            {apiKey && (
+                <label className="grid gap-1 text-xs text-muted-foreground">
+                    {t('apiKey.form.key')}
+                    <div className="relative">
+                        <Input
+                            type={showAPIKey ? 'text' : 'password'}
+                            value={form.api_key ?? ''}
+                            onChange={(e) => updateForm({ api_key: e.target.value })}
+                            className="h-9 text-sm rounded-xl pr-10 font-mono"
+                            disabled={isPending}
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowAPIKey((visible) => !visible)}
+                            disabled={isPending}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            aria-label={showAPIKey ? t('apiKey.form.hideKey') : t('apiKey.form.showKey')}
+                            title={showAPIKey ? t('apiKey.form.hideKey') : t('apiKey.form.showKey')}
+                        >
+                            {showAPIKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                    </div>
+                    {confirmKeyChange && (
+                        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                            {t('apiKey.form.keyChangeConfirm')}
+                        </div>
+                    )}
+                </label>
+            )}
 
             <div className="grid gap-1 text-xs text-muted-foreground">
                 {t('apiKey.form.maxCost')}
@@ -337,7 +378,7 @@ function APIKeyForm({ apiKey, isPending, submitLabel, onSubmit, onClose }: APIKe
                     className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
                 >
                     {isPending ? <Loader className="size-4 animate-spin" /> : <Check className="size-4" />}
-                    {submitLabel}
+                    {confirmKeyChange ? t('apiKey.form.confirm') : submitLabel}
                 </button>
             </div>
         </form>
@@ -356,7 +397,7 @@ function APIKeyFormOverlay({
     apiKey?: APIKey;
     isPending: boolean;
     submitLabel: string;
-    onSubmit: (data: Omit<APIKey, 'id' | 'api_key'>) => void;
+    onSubmit: (data: Omit<APIKey, 'id' | 'api_key'> & { api_key?: string }) => void;
     onClose: () => void;
 }) {
     return (
@@ -616,8 +657,10 @@ function APIKeyPanelBase({
 
     const disabledHeaderActions = createAPIKey.isPending || isAdding || !!viewingStats || !!editingKey;
 
-    const handleCreate = useCallback((data: Omit<APIKey, 'id' | 'api_key'>) => {
-        createAPIKey.mutate(data, {
+    const handleCreate = useCallback((data: Omit<APIKey, 'id' | 'api_key'> & { api_key?: string }) => {
+        const createData = { ...data };
+        delete createData.api_key;
+        createAPIKey.mutate(createData, {
             onSuccess: () => {
                 toast.success(t('apiKey.toast.createSuccess'));
                 setIsAdding(false);
@@ -629,7 +672,7 @@ function APIKeyPanelBase({
         });
     }, [createAPIKey, t]);
 
-    const handleUpdate = useCallback((apiKey: APIKey, data: Omit<APIKey, 'id' | 'api_key'>) => {
+    const handleUpdate = useCallback((apiKey: APIKey, data: Omit<APIKey, 'id' | 'api_key'> & { api_key?: string }) => {
         updateAPIKey.mutate({ id: apiKey.id, ...data }, {
             onSuccess: () => {
                 toast.success(t('apiKey.toast.updateSuccess'));

@@ -3,6 +3,7 @@ package op
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/bestruirui/octopus/internal/db"
 	"github.com/bestruirui/octopus/internal/model"
@@ -26,11 +27,24 @@ func APIKeyUpdate(key *model.APIKey, ctx context.Context) error {
 	if !ok {
 		return fmt.Errorf("API key not found")
 	}
-	if err := db.GetDB().WithContext(ctx).Omit("api_key").Save(key).Error; err != nil {
+	nextAPIKey := strings.TrimSpace(key.APIKey)
+	if nextAPIKey == "" {
+		nextAPIKey = existing.APIKey
+	}
+	if nextAPIKey != existing.APIKey {
+		if existingID, ok := apiKeyIDMap.Get(nextAPIKey); ok && existingID != key.ID {
+			return fmt.Errorf("API key already exists")
+		}
+	}
+	key.APIKey = nextAPIKey
+	if err := db.GetDB().WithContext(ctx).Save(key).Error; err != nil {
 		return fmt.Errorf("failed to update API key: %w", err)
 	}
-	key.APIKey = existing.APIKey
 	apiKeyCache.Set(key.ID, *key)
+	if nextAPIKey != existing.APIKey {
+		apiKeyIDMap.Del(existing.APIKey)
+		apiKeyIDMap.Set(nextAPIKey, key.ID)
+	}
 	return nil
 }
 
@@ -67,6 +81,10 @@ func APIKeyGetByAPIKey(apiKey string, ctx context.Context) (model.APIKey, error)
 }
 
 func APIKeyDelete(id int, ctx context.Context) error {
+	existing, ok := apiKeyCache.Get(id)
+	if !ok {
+		return fmt.Errorf("API key not found")
+	}
 	k := model.APIKey{
 		ID: id,
 	}
@@ -81,7 +99,7 @@ func APIKeyDelete(id int, ctx context.Context) error {
 		return fmt.Errorf("failed to delete API key: %w", result.Error)
 	}
 	apiKeyCache.Del(k.ID)
-	apiKeyIDMap.Del(k.APIKey)
+	apiKeyIDMap.Del(existing.APIKey)
 	return nil
 }
 

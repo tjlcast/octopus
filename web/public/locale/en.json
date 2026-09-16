@@ -213,6 +213,10 @@
             "loadFailed": "Failed to load",
             "form": {
                 "name": "Name",
+                "key": "Key",
+                "showKey": "Show key",
+                "hideKey": "Hide key",
+                "keyChangeConfirm": "The key was changed. Click confirm again to save.",
                 "maxCost": "Max Cost",
                 "maxCostPlaceholder": "Enter amount",
                 "unlimited": "Unlimited",

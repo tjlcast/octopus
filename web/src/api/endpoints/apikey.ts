@@ -89,7 +89,7 @@ export type CreateAPIKeyRequest = Omit<APIKey, 'id' | 'api_key'> & { enabled?: b
 /**
  * 更新 API Key 请求
  */
-export type UpdateAPIKeyRequest = Pick<APIKey, 'id'> & CreateAPIKeyRequest;
+export type UpdateAPIKeyRequest = Pick<APIKey, 'id'> & CreateAPIKeyRequest & Partial<Pick<APIKey, 'api_key'>>;
 
 /**
  * 获取 API Key 列表 Hook
