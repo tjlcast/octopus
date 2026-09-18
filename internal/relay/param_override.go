@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const deleteOverrideKey = "$delete"
+
 func (ra *relayAttempt) applyParamOverride(req *http.Request) error {
 	if ra.channel.ParamOverride == nil || strings.TrimSpace(*ra.channel.ParamOverride) == "" {
 		return nil
@@ -51,6 +53,11 @@ func (ra *relayAttempt) applyParamOverride(req *http.Request) error {
 
 func mergeJSONObjects(dst, src map[string]any) {
 	for key, value := range src {
+		if key == deleteOverrideKey {
+			deleteJSONPaths(dst, value)
+			continue
+		}
+
 		srcObj, srcIsObj := value.(map[string]any)
 		dstObj, dstIsObj := dst[key].(map[string]any)
 		if srcIsObj && dstIsObj {
@@ -58,5 +65,51 @@ func mergeJSONObjects(dst, src map[string]any) {
 			continue
 		}
 		dst[key] = value
+	}
+}
+
+func deleteJSONPaths(dst map[string]any, paths any) {
+	for _, path := range stringSlice(paths) {
+		deleteJSONPath(dst, path)
+	}
+}
+
+func deleteJSONPath(dst map[string]any, path string) {
+	parts := strings.Split(path, ".")
+	if len(parts) == 0 {
+		return
+	}
+
+	current := dst
+	for _, part := range parts[:len(parts)-1] {
+		next, ok := current[part].(map[string]any)
+		if !ok {
+			return
+		}
+		current = next
+	}
+	delete(current, parts[len(parts)-1])
+}
+
+func stringSlice(value any) []string {
+	switch v := value.(type) {
+	case []any:
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			path, ok := item.(string)
+			if ok && strings.TrimSpace(path) != "" {
+				result = append(result, path)
+			}
+		}
+		return result
+	case []string:
+		return v
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return nil
+		}
+		return []string{v}
+	default:
+		return nil
 	}
 }
