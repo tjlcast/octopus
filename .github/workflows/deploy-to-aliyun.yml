@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - deploy
+  workflow_dispatch:
+    inputs:
+      aliyun_port:
+        description: 'SSH port for Aliyun server. Uses secret ALIYUN_PORT or 22 when empty.'
+        required: false
+        default: ''
+      octopus_host_port:
+        description: 'Host port exposed by the Octopus container. Uses secret OCTOPUS_HOST_PORT or 8080 when empty.'
+        required: false
+        default: ''
 
 jobs:
   deploy:
@@ -88,10 +98,10 @@ jobs:
           ALIYUN_IP: ${{ secrets.ALIYUN_IP }}
           ALIYUN_USER: ${{ secrets.ALIYUN_USER }}
           ALIYUN_PASSWORD: ${{ secrets.ALIYUN_PASSWORD }}
-          ALIYUN_PORT: ${{ secrets.ALIYUN_PORT }}
+          ALIYUN_PORT: ${{ github.event.inputs.aliyun_port || secrets.ALIYUN_PORT }}
           ALIYUN_REMOTE_DIR: ${{ secrets.ALIYUN_REMOTE_DIR }}
           OCTOPUS_CONTAINER_NAME: ${{ secrets.OCTOPUS_CONTAINER_NAME }}
-          OCTOPUS_HOST_PORT: ${{ secrets.OCTOPUS_HOST_PORT }}
+          OCTOPUS_HOST_PORT: ${{ github.event.inputs.octopus_host_port || secrets.OCTOPUS_HOST_PORT }}
           OCTOPUS_DATA_DIR: ${{ secrets.OCTOPUS_DATA_DIR }}
         run: |
           set -euo pipefail
@@ -105,6 +115,17 @@ jobs:
           CONTAINER_NAME="${OCTOPUS_CONTAINER_NAME:-octopus}"
           HOST_PORT="${OCTOPUS_HOST_PORT:-8080}"
           DATA_DIR="${OCTOPUS_DATA_DIR:-octopus-data}"
+
+          if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then
+            echo "ALIYUN_PORT must be a number, got: ${PORT}" >&2
+            exit 1
+          fi
+
+          if ! [[ "${HOST_PORT}" =~ ^[0-9]+$ ]]; then
+            echo "OCTOPUS_HOST_PORT must be a number, got: ${HOST_PORT}" >&2
+            exit 1
+          fi
+
           SSH_OPTS="-p ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
           SCP_OPTS="-P ${PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
