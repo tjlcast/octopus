@@ -53,6 +53,7 @@ fi
 echo "Building Docker image ${IMAGE_REF}..."
 docker build \
   --pull \
+  --platform "${TARGET_PLATFORM}" \
   --build-arg "TARGETPLATFORM=${TARGET_PLATFORM}" \
   -f "${DOCKERFILE}" \
   -t "${IMAGE_REF}" \
