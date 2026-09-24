@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Dialog,
     DialogContent,
     DialogFooter,
@@ -28,7 +35,10 @@ import {
     useDeleteTrafficControlRule,
     useTrafficControlRuleList,
     useUpdateTrafficControlRule,
+    type TrafficControlBodyClause,
+    type TrafficControlBodyOperator,
     type CreateTrafficControlRuleRequest,
+    type TrafficControlMatchType,
     type TrafficControlRule,
 } from '@/api/endpoints/traffic-control';
 
@@ -50,6 +60,35 @@ const defaultForm: RuleFormValue = {
 
 function ipsToText(rule?: TrafficControlRule): string {
     return rule?.match_config?.ips?.join('\n') ?? '';
+}
+
+function bodyClausesToForm(rule?: TrafficControlRule): TrafficControlBodyClause[] {
+    const clauses = rule?.match_config?.body_clauses
+        ?.map((clause, index) => ({
+            keyword: clause.keyword ?? '',
+            operator: index === 0 ? 'and' : normalizeBodyOperator(clause.operator),
+            not: Boolean(clause.not),
+        }))
+        .filter((clause) => clause.keyword?.trim());
+    if (clauses?.length) return clauses;
+
+    const keywords = rule?.match_config?.body_keywords?.length
+        ? rule.match_config.body_keywords
+        : rule?.match_config?.body
+            ? [rule.match_config.body]
+            : [];
+    if (!keywords.length) return [{ keyword: '', operator: 'and', not: false }];
+
+    const mode = rule?.match_config?.mode;
+    return keywords.map((keyword, index) => ({
+        keyword,
+        operator: index > 0 && mode === 'or' ? 'or' : 'and',
+        not: mode === 'not',
+    }));
+}
+
+function normalizeBodyOperator(operator?: string): TrafficControlBodyOperator {
+    return operator === 'or' ? 'or' : 'and';
 }
 
 function textToIPs(text: string): string[] {
@@ -85,6 +124,24 @@ function getErrorMessage(error: unknown): string | undefined {
     return (error as ApiError | undefined)?.message;
 }
 
+function ruleMatchLabel(rule: TrafficControlRule): string {
+    if (rule.match_type === 'body') {
+        return bodyClausesToForm(rule)
+            .filter((clause) => clause.keyword?.trim())
+            .map((clause, index) => {
+                const prefix = index === 0 ? '' : `${normalizeBodyOperator(clause.operator).toUpperCase()} `;
+                return `${prefix}${clause.not ? 'NOT ' : ''}${clause.keyword}`;
+            })
+            .join(' ');
+    }
+    return (rule.match_config.ips ?? []).join(', ');
+}
+
+function ruleMatchTypeLabel(matchType: TrafficControlMatchType): string {
+    if (matchType === 'body') return 'Body 关键词';
+    return 'IP / IP 段';
+}
+
 function RuleDialog({
     open,
     rule,
@@ -100,6 +157,7 @@ function RuleDialog({
 }) {
     const [form, setForm] = useState<RuleFormValue>(() => ruleToForm(rule));
     const [ipText, setIpText] = useState(() => ipsToText(rule));
+    const [bodyClauses, setBodyClauses] = useState<TrafficControlBodyClause[]>(() => bodyClausesToForm(rule));
 
     const updateForm = useCallback((patch: Partial<RuleFormValue>) => {
         setForm((prev) => ({ ...prev, ...patch }));
@@ -109,18 +167,53 @@ function RuleDialog({
         setForm((prev) => ({ ...prev, action_config: { ...prev.action_config, ...patch } }));
     }, []);
 
+    const updateBodyClause = useCallback((index: number, patch: Partial<TrafficControlBodyClause>) => {
+        setBodyClauses((prev) => prev.map((clause, currentIndex) => (
+            currentIndex === index ? { ...clause, ...patch } : clause
+        )));
+    }, []);
+
+    const addBodyClause = useCallback(() => {
+        setBodyClauses((prev) => [...prev, { keyword: '', operator: 'and', not: false }]);
+    }, []);
+
+    const removeBodyClause = useCallback((index: number) => {
+        setBodyClauses((prev) => {
+            const next = prev.filter((_, currentIndex) => currentIndex !== index);
+            return next.length > 0 ? next : [{ keyword: '', operator: 'and', not: false }];
+        });
+    }, []);
+
     const handleSubmit = useCallback((event: React.FormEvent) => {
         event.preventDefault();
         const ips = textToIPs(ipText);
+        const normalizedBodyClauses = bodyClauses
+            .map((clause, index) => ({
+                keyword: clause.keyword?.trim() ?? '',
+                operator: index === 0 ? 'and' : normalizeBodyOperator(clause.operator),
+                not: Boolean(clause.not),
+            }))
+            .filter((clause) => clause.keyword.length > 0);
+        const matchConfig = form.match_type === 'body'
+            ? {
+                body: normalizedBodyClauses[0]?.keyword ?? '',
+                body_keywords: normalizedBodyClauses.map((clause) => clause.keyword),
+                body_clauses: normalizedBodyClauses,
+            }
+            : { ips };
+
         onSubmit({
             ...form,
-            match_type: 'ip',
-            match_config: { ...form.match_config, ips },
+            match_config: matchConfig,
             action_type: 'fast_fail',
         });
-    }, [form, ipText, onSubmit]);
+    }, [bodyClauses, form, ipText, onSubmit]);
 
-    const canSubmit = form.name.trim().length > 0 && textToIPs(ipText).length > 0;
+    const canSubmit = form.name.trim().length > 0 && (
+        form.match_type === 'body'
+            ? bodyClauses.some((clause) => clause.keyword?.trim())
+            : textToIPs(ipText).length > 0
+    );
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -160,16 +253,91 @@ function RuleDialog({
                     </label>
 
                     <label className="grid gap-1 text-sm">
-                        IP / IP 段
-                        <textarea
-                            value={ipText}
-                            onChange={(event) => setIpText(event.target.value)}
+                        匹配方式
+                        <Select
+                            value={form.match_type}
+                            onValueChange={(matchType: TrafficControlMatchType) => updateForm({ match_type: matchType })}
                             disabled={isPending}
-                            placeholder={'192.168.1.10\n10.0.0.0/24\n172.16.0.10-172.16.0.20'}
-                            className="min-h-28 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
-                            required
-                        />
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ip">IP / IP 段</SelectItem>
+                                <SelectItem value="body">Body 关键词</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </label>
+
+                    {form.match_type === 'body' ? (
+                        <div className="grid gap-3">
+                            <div className="grid gap-2">
+                                {bodyClauses.map((clause, index) => (
+                                    <div key={index} className="grid grid-cols-[84px_72px_1fr_36px] gap-2">
+                                        {index === 0 ? (
+                                            <div className="flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground">
+                                                IF
+                                            </div>
+                                        ) : (
+                                            <Select
+                                                value={normalizeBodyOperator(clause.operator)}
+                                                onValueChange={(operator: TrafficControlBodyOperator) => updateBodyClause(index, { operator })}
+                                                disabled={isPending}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="and">AND</SelectItem>
+                                                    <SelectItem value="or">OR</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                        <div className="flex items-center justify-center gap-2 rounded-md border px-2">
+                                            <Switch
+                                                checked={Boolean(clause.not)}
+                                                onCheckedChange={(not) => updateBodyClause(index, { not })}
+                                                disabled={isPending}
+                                            />
+                                            <span className="text-xs">NOT</span>
+                                        </div>
+                                        <Input
+                                            value={clause.keyword ?? ''}
+                                            onChange={(event) => updateBodyClause(index, { keyword: event.target.value })}
+                                            disabled={isPending}
+                                            placeholder="关键词"
+                                            required={index === 0}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removeBodyClause(index)}
+                                            disabled={isPending || bodyClauses.length === 1}
+                                        >
+                                            <Trash2 className="size-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                            <Button type="button" variant="outline" onClick={addBodyClause} disabled={isPending}>
+                                <Plus className="size-4" />
+                                添加子句
+                            </Button>
+                        </div>
+                    ) : (
+                        <label className="grid gap-1 text-sm">
+                            IP / IP 段
+                            <textarea
+                                value={ipText}
+                                onChange={(event) => setIpText(event.target.value)}
+                                disabled={isPending}
+                                placeholder={'192.168.1.10\n10.0.0.0/24\n172.16.0.10-172.16.0.20'}
+                                className="min-h-28 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
+                                required
+                            />
+                        </label>
+                    )}
 
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-[120px_1fr]">
                         <label className="grid gap-1 text-sm">
@@ -269,7 +437,7 @@ export function TrafficControl() {
                     </div>
                     <div>
                         <h1 className="text-xl font-semibold">流量控制</h1>
-                        <p className="text-sm text-muted-foreground">当前支持按 IP、CIDR 或起止 IP 段快速失败。</p>
+                        <p className="text-sm text-muted-foreground">当前支持按 IP、CIDR、起止 IP 段或 Body 关键词快速失败。</p>
                     </div>
                 </div>
                 <Button onClick={() => setIsCreating(true)}>
@@ -293,7 +461,7 @@ export function TrafficControl() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>规则</TableHead>
-                                <TableHead>IP / IP 段</TableHead>
+                                <TableHead>匹配条件</TableHead>
                                 <TableHead>动作</TableHead>
                                 <TableHead>优先级</TableHead>
                                 <TableHead>状态</TableHead>
@@ -311,7 +479,10 @@ export function TrafficControl() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="max-w-[360px] truncate font-mono text-xs">
-                                            {(rule.match_config.ips ?? []).join(', ')}
+                                            <span className="mr-2 rounded border px-1.5 py-0.5 font-sans text-[11px]">
+                                                {ruleMatchTypeLabel(rule.match_type)}
+                                            </span>
+                                            {ruleMatchLabel(rule)}
                                         </div>
                                     </TableCell>
                                     <TableCell>

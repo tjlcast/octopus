@@ -87,24 +87,54 @@ func TrafficControlCheckIP(ip string) TrafficControlDecision {
 		if !trafficControlIPMatch(ip, rule.MatchConfig.IPs) {
 			continue
 		}
-		statusCode := rule.ActionConfig.StatusCode
-		if statusCode < 400 || statusCode > 599 {
-			statusCode = 429
-		}
-		message := strings.TrimSpace(rule.ActionConfig.Message)
-		if message == "" {
-			message = "request blocked by traffic control"
-		}
-		return TrafficControlDecision{
-			Blocked:    true,
-			RuleID:     rule.ID,
-			RuleName:   rule.Name,
-			StatusCode: statusCode,
-			Message:    message,
-		}
+		return trafficControlDecisionFromRule(rule)
 	}
 
 	return TrafficControlDecision{}
+}
+
+func TrafficControlCheckBody(body []byte) TrafficControlDecision {
+	trafficControlCache.RLock()
+	rules := append([]model.TrafficControlRule(nil), trafficControlCache.rules...)
+	trafficControlCache.RUnlock()
+
+	bodyText := string(body)
+	for _, rule := range rules {
+		if !rule.Enabled || rule.MatchType != model.TrafficControlMatchTypeBody {
+			continue
+		}
+		if rule.ActionType != model.TrafficControlActionTypeFastFail {
+			continue
+		}
+		clauses := trafficControlBodyClauses(rule.MatchConfig)
+		if len(clauses) == 0 {
+			continue
+		}
+		if trafficControlBodyMatch(bodyText, clauses) {
+			continue
+		}
+		return trafficControlDecisionFromRule(rule)
+	}
+
+	return TrafficControlDecision{}
+}
+
+func trafficControlDecisionFromRule(rule model.TrafficControlRule) TrafficControlDecision {
+	statusCode := rule.ActionConfig.StatusCode
+	if statusCode < 400 || statusCode > 599 {
+		statusCode = 429
+	}
+	message := strings.TrimSpace(rule.ActionConfig.Message)
+	if message == "" {
+		message = "request blocked by traffic control"
+	}
+	return TrafficControlDecision{
+		Blocked:    true,
+		RuleID:     rule.ID,
+		RuleName:   rule.Name,
+		StatusCode: statusCode,
+		Message:    message,
+	}
 }
 
 func trafficControlRefreshCache(ctx context.Context) error {
@@ -141,6 +171,21 @@ func normalizeTrafficControlRule(rule *model.TrafficControlRule) {
 	rule.MatchConfig.IPs = normalizeStringList(rule.MatchConfig.IPs)
 	rule.MatchConfig.Paths = normalizeStringList(rule.MatchConfig.Paths)
 	rule.MatchConfig.Headers = normalizeStringList(rule.MatchConfig.Headers)
+	rule.MatchConfig.Body = strings.TrimSpace(rule.MatchConfig.Body)
+	rule.MatchConfig.BodyKeywords = normalizeOrderedStringList(rule.MatchConfig.BodyKeywords)
+	rule.MatchConfig.Mode = strings.ToLower(strings.TrimSpace(rule.MatchConfig.Mode))
+	if rule.MatchConfig.Mode == "" && rule.MatchType == model.TrafficControlMatchTypeBody {
+		rule.MatchConfig.Mode = "and"
+	}
+	rule.MatchConfig.BodyClauses = trafficControlBodyClauses(rule.MatchConfig)
+	if len(rule.MatchConfig.BodyClauses) > 0 {
+		keywords := make([]string, 0, len(rule.MatchConfig.BodyClauses))
+		for _, clause := range rule.MatchConfig.BodyClauses {
+			keywords = append(keywords, clause.Keyword)
+		}
+		rule.MatchConfig.BodyKeywords = keywords
+		rule.MatchConfig.Body = rule.MatchConfig.BodyClauses[0].Keyword
+	}
 }
 
 func validateTrafficControlRule(rule *model.TrafficControlRule) error {
@@ -152,7 +197,11 @@ func validateTrafficControlRule(rule *model.TrafficControlRule) error {
 		if len(rule.MatchConfig.IPs) == 0 {
 			return fmt.Errorf("traffic control rule ip list is required")
 		}
-	case model.TrafficControlMatchTypePath, model.TrafficControlMatchTypeBody, model.TrafficControlMatchTypeHeader, model.TrafficControlMatchTypeComposite:
+	case model.TrafficControlMatchTypeBody:
+		if len(trafficControlBodyClauses(rule.MatchConfig)) == 0 {
+			return fmt.Errorf("traffic control rule body keyword is required")
+		}
+	case model.TrafficControlMatchTypePath, model.TrafficControlMatchTypeHeader, model.TrafficControlMatchTypeComposite:
 	default:
 		return fmt.Errorf("unsupported traffic control match type: %s", rule.MatchType)
 	}
@@ -181,6 +230,92 @@ func normalizeStringList(values []string) []string {
 	}
 	sort.Strings(next)
 	return next
+}
+
+func trafficControlBodyClauses(config model.TrafficControlMatchConfig) []model.TrafficControlBodyClause {
+	if len(config.BodyClauses) > 0 {
+		clauses := make([]model.TrafficControlBodyClause, 0, len(config.BodyClauses))
+		for _, clause := range config.BodyClauses {
+			keyword := strings.TrimSpace(clause.Keyword)
+			if keyword == "" {
+				continue
+			}
+			operator := normalizeTrafficControlBodyOperator(clause.Operator)
+			clauses = append(clauses, model.TrafficControlBodyClause{
+				Keyword:  keyword,
+				Operator: operator,
+				Not:      clause.Not,
+			})
+		}
+		return clauses
+	}
+
+	keywords := normalizeOrderedStringList(config.BodyKeywords)
+	body := strings.TrimSpace(config.Body)
+	if len(keywords) == 0 && body != "" {
+		keywords = []string{body}
+	}
+	clauses := make([]model.TrafficControlBodyClause, 0, len(keywords))
+	mode := strings.ToLower(strings.TrimSpace(config.Mode))
+	for index, keyword := range keywords {
+		operator := "and"
+		if index > 0 && mode == "or" {
+			operator = "or"
+		}
+		clauses = append(clauses, model.TrafficControlBodyClause{
+			Keyword:  keyword,
+			Operator: operator,
+			Not:      mode == "not",
+		})
+	}
+	return clauses
+}
+
+func normalizeTrafficControlBodyOperator(operator string) string {
+	switch strings.ToLower(strings.TrimSpace(operator)) {
+	case "or":
+		return "or"
+	default:
+		return "and"
+	}
+}
+
+func normalizeOrderedStringList(values []string) []string {
+	next := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		next = append(next, value)
+	}
+	return next
+}
+
+func trafficControlBodyMatch(body string, clauses []model.TrafficControlBodyClause) bool {
+	result := trafficControlBodyClauseMatch(body, clauses[0])
+	for index := 1; index < len(clauses); index++ {
+		next := trafficControlBodyClauseMatch(body, clauses[index])
+		if clauses[index].Operator == "or" {
+			result = result || next
+			continue
+		}
+		result = result && next
+	}
+	return result
+}
+
+func trafficControlBodyClauseMatch(body string, clause model.TrafficControlBodyClause) bool {
+	matched := strings.Contains(body, clause.Keyword)
+	if clause.Not {
+		return !matched
+	}
+	return matched
 }
 
 func trafficControlIPMatch(ip string, rules []string) bool {

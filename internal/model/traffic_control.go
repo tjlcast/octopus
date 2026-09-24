@@ -17,11 +17,19 @@ const (
 )
 
 type TrafficControlMatchConfig struct {
-	IPs     []string `json:"ips,omitempty"`
-	Paths   []string `json:"paths,omitempty"`
-	Headers []string `json:"headers,omitempty"`
-	Body    string   `json:"body,omitempty"`
-	Mode    string   `json:"mode,omitempty"`
+	IPs          []string                   `json:"ips,omitempty"`
+	Paths        []string                   `json:"paths,omitempty"`
+	Headers      []string                   `json:"headers,omitempty"`
+	Body         string                     `json:"body,omitempty"`
+	BodyKeywords []string                   `json:"body_keywords,omitempty"`
+	BodyClauses  []TrafficControlBodyClause `json:"body_clauses,omitempty"`
+	Mode         string                     `json:"mode,omitempty"`
+}
+
+type TrafficControlBodyClause struct {
+	Keyword  string `json:"keyword,omitempty"`
+	Operator string `json:"operator,omitempty"`
+	Not      bool   `json:"not,omitempty"`
 }
 
 type TrafficControlActionConfig struct {

@@ -220,6 +220,12 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return nil, nil, err
 	}
+	if decision := op.TrafficControlCheckBody(body); decision.Blocked {
+		c.Header("X-Traffic-Control-Rule", decision.RuleName)
+		resp.Error(c, decision.StatusCode, decision.Message)
+		c.Abort()
+		return nil, nil, fmt.Errorf("request blocked by traffic control rule %d", decision.RuleID)
+	}
 
 	inAdapter := inbound.Get(inboundType)
 	internalRequest, err := inAdapter.TransformRequest(c.Request.Context(), body)

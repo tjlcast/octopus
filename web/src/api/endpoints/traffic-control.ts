@@ -4,13 +4,23 @@ import { logger } from '@/lib/logger';
 
 export type TrafficControlMatchType = 'ip' | 'path' | 'body' | 'header' | 'composite';
 export type TrafficControlActionType = 'fast_fail' | 'concurrency';
+export type TrafficControlBodyMode = 'and' | 'or' | 'not';
+export type TrafficControlBodyOperator = 'and' | 'or';
+
+export interface TrafficControlBodyClause {
+    keyword?: string;
+    operator?: TrafficControlBodyOperator;
+    not?: boolean;
+}
 
 export interface TrafficControlMatchConfig {
     ips?: string[];
     paths?: string[];
     headers?: string[];
     body?: string;
-    mode?: string;
+    body_keywords?: string[];
+    body_clauses?: TrafficControlBodyClause[];
+    mode?: TrafficControlBodyMode;
 }
 
 export interface TrafficControlActionConfig {
