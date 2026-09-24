@@ -19,6 +19,7 @@ jobs:
   deploy:
     name: Build and deploy ARM Docker image
     runs-on: ubuntu-latest
+    environment: huhuhu
 
     steps:
       - name: Checkout
