@@ -39,8 +39,6 @@ func init() {
 func listLog(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	startTimeStr := c.Query("start_time")
-	endTimeStr := c.Query("end_time")
 
 	if page < 1 {
 		page = 1
@@ -49,29 +47,68 @@ func listLog(c *gin.Context) {
 		pageSize = 20
 	}
 
-	var startTime, endTime *int
-	if startTimeStr != "" && endTimeStr != "" {
-		st, err := strconv.Atoi(startTimeStr)
-		if err != nil {
-			resp.Error(c, http.StatusBadRequest, err.Error())
-			return
-		}
-		et, err := strconv.Atoi(endTimeStr)
-		if err != nil {
-			resp.Error(c, http.StatusBadRequest, err.Error())
-			return
-		}
-		startTime = &st
-		endTime = &et
+	filters, err := parseLogFilters(c)
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
 	}
 
-	logs, err := op.RelayLogList(c.Request.Context(), startTime, endTime, page, pageSize)
+	logs, err := op.RelayLogList(c.Request.Context(), filters, page, pageSize)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	resp.Success(c, logs)
+}
+
+func parseLogFilters(c *gin.Context) (op.RelayLogFilter, error) {
+	filter := op.RelayLogFilter{
+		RequestModelName: c.Query("request_model_name"),
+		ActualModelName:  c.Query("actual_model_name"),
+	}
+
+	var err error
+	for _, item := range []struct {
+		name   string
+		target **int
+	}{
+		{"start_time", &filter.StartTime},
+		{"end_time", &filter.EndTime},
+		{"min_input_tokens", &filter.MinInputTokens},
+		{"max_input_tokens", &filter.MaxInputTokens},
+		{"min_output_tokens", &filter.MinOutputTokens},
+		{"max_output_tokens", &filter.MaxOutputTokens},
+		{"min_ftut", &filter.MinFtut},
+		{"max_ftut", &filter.MaxFtut},
+		{"min_use_time", &filter.MinUseTime},
+		{"max_use_time", &filter.MaxUseTime},
+		{"channel_id", &filter.ChannelID},
+	} {
+		if *item.target, err = optionalNonNegativeInt(c.Query(item.name), item.name); err != nil {
+			return op.RelayLogFilter{}, err
+		}
+	}
+
+	filter.Status = c.Query("status")
+	if filter.Status != "" && filter.Status != "success" && filter.Status != "failed" {
+		return op.RelayLogFilter{}, fmt.Errorf("status must be success or failed")
+	}
+	if err := filter.Validate(); err != nil {
+		return op.RelayLogFilter{}, err
+	}
+	return filter, nil
+}
+
+func optionalNonNegativeInt(value, name string) (*int, error) {
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return nil, fmt.Errorf("%s must be a non-negative integer", name)
+	}
+	return &parsed, nil
 }
 
 func clearLog(c *gin.Context) {

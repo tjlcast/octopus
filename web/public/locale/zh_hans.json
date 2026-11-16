@@ -429,6 +429,28 @@
         }
     },
     "log": {
+        "filters": {
+            "title": "筛选日志",
+            "expand": "展开筛选",
+            "collapse": "收起筛选",
+            "apply": "应用筛选",
+            "reset": "重置",
+            "startTime": "开始时间",
+            "endTime": "结束时间",
+            "inputTokens": "输入 Token",
+            "outputTokens": "输出 Token",
+            "firstToken": "首字时间",
+            "totalTime": "总耗时",
+            "channelId": "渠道 ID",
+            "status": "状态",
+            "all": "全部",
+            "success": "成功",
+            "failed": "失败",
+            "requestModel": "请求模型",
+            "actualModel": "实际模型",
+            "exactMatch": "精确匹配",
+            "invalidRange": "请输入有效的非负数，并确保最小值不大于最大值。"
+        },
         "list": {
             "noMore": "没有更多日志了"
         },

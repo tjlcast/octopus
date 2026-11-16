@@ -57,6 +57,50 @@ export interface LogListParams {
     end_time?: number;
 }
 
+export interface LogFilters {
+    start_time?: number;
+    end_time?: number;
+    min_input_tokens?: number;
+    max_input_tokens?: number;
+    min_output_tokens?: number;
+    max_output_tokens?: number;
+    min_ftut?: number;
+    max_ftut?: number;
+    min_use_time?: number;
+    max_use_time?: number;
+    channel_id?: number;
+    request_model_name?: string;
+    actual_model_name?: string;
+    status?: 'success' | 'failed';
+}
+
+function normalizeFilters(filters: LogFilters): LogFilters {
+    return Object.fromEntries(
+        Object.entries(filters).filter(([, value]) => value !== undefined && value !== '')
+    ) as LogFilters;
+}
+
+function matchesLogFilters(log: RelayLog, filters: LogFilters): boolean {
+    if ((filters.start_time !== undefined && log.time < filters.start_time) ||
+        (filters.end_time !== undefined && log.time > filters.end_time) ||
+        (filters.min_input_tokens !== undefined && log.input_tokens < filters.min_input_tokens) ||
+        (filters.max_input_tokens !== undefined && log.input_tokens > filters.max_input_tokens) ||
+        (filters.min_output_tokens !== undefined && log.output_tokens < filters.min_output_tokens) ||
+        (filters.max_output_tokens !== undefined && log.output_tokens > filters.max_output_tokens) ||
+        (filters.min_ftut !== undefined && log.ftut < filters.min_ftut) ||
+        (filters.max_ftut !== undefined && log.ftut > filters.max_ftut) ||
+        (filters.min_use_time !== undefined && log.use_time < filters.min_use_time) ||
+        (filters.max_use_time !== undefined && log.use_time > filters.max_use_time) ||
+        (filters.channel_id !== undefined && log.channel !== filters.channel_id) ||
+        (filters.request_model_name !== undefined && log.request_model_name !== filters.request_model_name) ||
+        (filters.actual_model_name !== undefined && log.actual_model_name !== filters.actual_model_name) ||
+        (filters.status === 'success' && !!log.error) ||
+        (filters.status === 'failed' && !log.error)) {
+        return false;
+    }
+    return true;
+}
+
 /**
  * 清空日志 Hook
  * 
@@ -82,7 +126,7 @@ export function useClearLogs() {
     });
 }
 
-const logsInfiniteQueryKey = (pageSize: number) => ['logs', 'infinite', pageSize] as const;
+const logsInfiniteQueryKey = (pageSize: number, filters: LogFilters) => ['logs', 'infinite', pageSize, filters] as const;
 
 /**
  * 日志管理 Hook
@@ -97,8 +141,9 @@ const logsInfiniteQueryKey = (pageSize: number) => ['logs', 'infinite', pageSize
  * // 滚动到底部时加载更多
  * if (hasMore && !isLoadingMore) loadMore();
  */
-export function useLogs(options: { pageSize?: number } = {}) {
-    const { pageSize = 20 } = options;
+export function useLogs(options: { pageSize?: number; filters?: LogFilters } = {}) {
+    const { pageSize = 20, filters: rawFilters = {} } = options;
+    const filters = useMemo(() => normalizeFilters(rawFilters), [rawFilters]);
 
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<Error | null>(null);
@@ -107,12 +152,15 @@ export function useLogs(options: { pageSize?: number } = {}) {
     const queryClient = useQueryClient();
 
     const logsQuery = useInfiniteQuery({
-        queryKey: logsInfiniteQueryKey(pageSize),
+        queryKey: logsInfiniteQueryKey(pageSize, filters),
         initialPageParam: 1,
         queryFn: async ({ pageParam }) => {
             const params = new URLSearchParams();
             params.set('page', String(pageParam));
             params.set('page_size', String(pageSize));
+            for (const [key, value] of Object.entries(filters)) {
+                params.set(key, String(value));
+            }
             const result = await apiClient.get<RelayLog[] | null>(`/api/v1/log/list?${params.toString()}`);
             return result ?? [];
         },
@@ -172,14 +220,14 @@ export function useLogs(options: { pageSize?: number } = {}) {
                     try {
                         const log: RelayLog = JSON.parse(event.data);
                         queryClient.setQueryData(
-                            logsInfiniteQueryKey(pageSize),
+                            logsInfiniteQueryKey(pageSize, filters),
                             (old: InfiniteData<RelayLog[], number> | undefined) => {
                                 if (!old) {
                                     return { pages: [[log]], pageParams: [1] };
                                 }
 
                                 const exists = old.pages.some((p) => p?.some((x) => x.id === log.id));
-                                if (exists) return old;
+                                if (exists || !matchesLogFilters(log, filters)) return old;
 
                                 const firstPage = old.pages[0] ?? [];
                                 return { ...old, pages: [[log, ...firstPage], ...old.pages.slice(1)] };
@@ -211,11 +259,11 @@ export function useLogs(options: { pageSize?: number } = {}) {
             eventSourceRef.current = null;
             setIsConnected(false);
         };
-    }, [pageSize, queryClient]);
+    }, [filters, pageSize, queryClient]);
 
     const clear = useCallback(() => {
-        queryClient.removeQueries({ queryKey: logsInfiniteQueryKey(pageSize) });
-    }, [pageSize, queryClient]);
+        queryClient.removeQueries({ queryKey: logsInfiniteQueryKey(pageSize, filters) });
+    }, [filters, pageSize, queryClient]);
 
     return {
         logs,

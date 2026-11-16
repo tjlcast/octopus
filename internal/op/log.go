@@ -186,24 +186,17 @@ func relayLogCleanup(ctx context.Context) error {
 	return db.GetDB().WithContext(ctx).Where("time < ?", cutoffTime).Delete(&model.RelayLog{}).Error
 }
 
-// RelayLogList 查询日志列表，支持可选的时间范围过滤
-// startTime 和 endTime 为 nil 时表示不限制时间范围
-func RelayLogList(ctx context.Context, startTime, endTime *int, page, pageSize int) ([]model.RelayLog, error) {
+// RelayLogList queries logs using optional filters.
+func RelayLogList(ctx context.Context, filters RelayLogFilter, page, pageSize int) ([]model.RelayLog, error) {
 	enabled, err := SettingGetBool(model.SettingKeyRelayLogKeepEnabled)
 	if err != nil {
 		return nil, err
 	}
-	hasTimeFilter := startTime != nil && endTime != nil
-
 	// 获取缓存中符合条件的日志
 	relayLogCacheLock.Lock()
 	var cachedLogs []model.RelayLog
 	for _, log := range relayLogCache {
-		if hasTimeFilter {
-			if log.Time >= int64(*startTime) && log.Time <= int64(*endTime) {
-				cachedLogs = append(cachedLogs, log)
-			}
-		} else {
+		if filters.matches(log) {
 			cachedLogs = append(cachedLogs, log)
 		}
 	}
@@ -238,9 +231,7 @@ func RelayLogList(ctx context.Context, startTime, endTime *int, page, pageSize i
 			}
 
 			query := db.GetDB().WithContext(ctx)
-			if hasTimeFilter {
-				query = query.Where("time >= ? AND time <= ?", *startTime, *endTime)
-			}
+			query = filters.apply(query)
 
 			var dbLogs []model.RelayLog
 			if err := query.Order("id DESC").Offset(dbOffset).Limit(remaining).Find(&dbLogs).Error; err != nil {

@@ -429,6 +429,28 @@
         }
     },
     "log": {
+        "filters": {
+            "title": "篩選日誌",
+            "expand": "展開篩選",
+            "collapse": "收合篩選",
+            "apply": "套用篩選",
+            "reset": "重設",
+            "startTime": "開始時間",
+            "endTime": "結束時間",
+            "inputTokens": "輸入 Token",
+            "outputTokens": "輸出 Token",
+            "firstToken": "首字時間",
+            "totalTime": "總耗時",
+            "channelId": "供應源 ID",
+            "status": "狀態",
+            "all": "全部",
+            "success": "成功",
+            "failed": "失敗",
+            "requestModel": "請求模型",
+            "actualModel": "實際模型",
+            "exactMatch": "精確比對",
+            "invalidRange": "請輸入有效的非負數，並確保最小值不大於最大值。"
+        },
         "list": {
             "noMore": "沒有更多日誌了"
         },

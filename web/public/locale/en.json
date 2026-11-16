@@ -429,6 +429,28 @@
         }
     },
     "log": {
+        "filters": {
+            "title": "Filter Logs",
+            "expand": "Expand filters",
+            "collapse": "Collapse filters",
+            "apply": "Apply",
+            "reset": "Reset",
+            "startTime": "Start Time",
+            "endTime": "End Time",
+            "inputTokens": "Input Tokens",
+            "outputTokens": "Output Tokens",
+            "firstToken": "First Token Time",
+            "totalTime": "Total Time",
+            "channelId": "Channel ID",
+            "status": "Status",
+            "all": "All",
+            "success": "Success",
+            "failed": "Failed",
+            "requestModel": "Requested Model",
+            "actualModel": "Actual Model",
+            "exactMatch": "Exact match",
+            "invalidRange": "Enter non-negative values and ensure each minimum does not exceed its maximum."
+        },
         "list": {
             "noMore": "No more logs"
         },
