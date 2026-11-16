@@ -449,6 +449,9 @@
             "requestModel": "请求模型",
             "actualModel": "实际模型",
             "exactMatch": "精确匹配",
+            "keyword": "关键词",
+            "keywordHint": "请求、响应或错误内容",
+            "keywordNot": "非（不包含关键词）",
             "invalidRange": "请输入有效的非负数，并确保最小值不大于最大值。"
         },
         "list": {

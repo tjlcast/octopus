@@ -72,6 +72,8 @@ export interface LogFilters {
     request_model_name?: string;
     actual_model_name?: string;
     status?: 'success' | 'failed';
+    keyword?: string;
+    keyword_not?: boolean;
 }
 
 function normalizeFilters(filters: LogFilters): LogFilters {
@@ -94,6 +96,10 @@ function matchesLogFilters(log: RelayLog, filters: LogFilters): boolean {
         (filters.channel_id !== undefined && log.channel !== filters.channel_id) ||
         (filters.request_model_name !== undefined && log.request_model_name !== filters.request_model_name) ||
         (filters.actual_model_name !== undefined && log.actual_model_name !== filters.actual_model_name) ||
+        (filters.keyword !== undefined && (
+            [log.request_content, log.response_content, log.error]
+                .some((content) => content.toLowerCase().includes(filters.keyword!.toLowerCase())) === !!filters.keyword_not
+        )) ||
         (filters.status === 'success' && !!log.error) ||
         (filters.status === 'failed' && !log.error)) {
         return false;

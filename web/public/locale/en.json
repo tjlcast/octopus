@@ -449,6 +449,9 @@
             "requestModel": "Requested Model",
             "actualModel": "Actual Model",
             "exactMatch": "Exact match",
+            "keyword": "Keyword",
+            "keywordHint": "Request, response, or error content",
+            "keywordNot": "Not (exclude keyword)",
             "invalidRange": "Enter non-negative values and ensure each minimum does not exceed its maximum."
         },
         "list": {

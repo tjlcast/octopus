@@ -16,7 +16,7 @@ const emptyFilters: FilterValues = {
   start_time: '', end_time: '', min_input_tokens: '', max_input_tokens: '',
   min_output_tokens: '', max_output_tokens: '', min_ftut: '', max_ftut: '',
   min_use_time: '', max_use_time: '', channel_id: '', request_model_name: '',
-  actual_model_name: '', status: '',
+  actual_model_name: '', status: '', keyword: '', keyword_not: '',
 };
 const numericKeys = ['min_input_tokens', 'max_input_tokens', 'min_output_tokens', 'max_output_tokens', 'min_ftut', 'max_ftut', 'min_use_time', 'max_use_time', 'channel_id'] as const;
 
@@ -40,6 +40,10 @@ function toLogFilters(values: FilterValues): LogFilters | null {
   }
   if (values.request_model_name.trim()) filters.request_model_name = values.request_model_name.trim();
   if (values.actual_model_name.trim()) filters.actual_model_name = values.actual_model_name.trim();
+  if (values.keyword.trim()) {
+    filters.keyword = values.keyword.trim();
+    filters.keyword_not = values.keyword_not === 'true';
+  }
   if (values.status === 'success' || values.status === 'failed') filters.status = values.status;
   return filters;
 }
@@ -92,6 +96,10 @@ export function Log() {
         <label className='grid gap-1.5 text-xs font-medium text-muted-foreground'>{t('filters.status')}<select className='h-9 rounded-md border border-input bg-transparent px-3 text-sm' value={draft.status} onChange={(e) => change('status', e.target.value)}><option value=''>{t('filters.all')}</option><option value='success'>{t('filters.success')}</option><option value='failed'>{t('filters.failed')}</option></select></label>
         <label className='grid gap-1.5 text-xs font-medium text-muted-foreground'>{t('filters.requestModel')}<Input value={draft.request_model_name} onChange={(e) => change('request_model_name', e.target.value)} placeholder={t('filters.exactMatch')} /></label>
         <label className='grid gap-1.5 text-xs font-medium text-muted-foreground'>{t('filters.actualModel')}<Input value={draft.actual_model_name} onChange={(e) => change('actual_model_name', e.target.value)} placeholder={t('filters.exactMatch')} /></label>
+        <div className='grid gap-1.5'>
+          <label className='grid gap-1.5 text-xs font-medium text-muted-foreground'>{t('filters.keyword')}<Input value={draft.keyword} onChange={(e) => change('keyword', e.target.value)} placeholder={t('filters.keywordHint')} /></label>
+          <label className='flex items-center gap-2 text-xs font-medium text-muted-foreground'><input type='checkbox' checked={draft.keyword_not === 'true'} onChange={(e) => change('keyword_not', String(e.target.checked))} />{t('filters.keywordNot')}</label>
+        </div>
         </div>
         {filterError && <p className='text-xs text-destructive'>{t('filters.invalidRange')}</p>}
       </form>}

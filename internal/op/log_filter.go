@@ -2,6 +2,7 @@ package op
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bestruirui/octopus/internal/model"
 	"gorm.io/gorm"
@@ -17,6 +18,8 @@ type RelayLogFilter struct {
 	ChannelID                         *int
 	RequestModelName, ActualModelName string
 	Status                            string
+	Keyword                           string
+	KeywordNot                        bool
 }
 
 func (f RelayLogFilter) Validate() error {
@@ -50,6 +53,15 @@ func (f RelayLogFilter) matches(log model.RelayLog) bool {
 		(f.ActualModelName != "" && log.ActualModelName != f.ActualModelName) {
 		return false
 	}
+	if f.Keyword != "" {
+		keyword := strings.ToLower(f.Keyword)
+		matched := strings.Contains(strings.ToLower(log.RequestContent), keyword) ||
+			strings.Contains(strings.ToLower(log.ResponseContent), keyword) ||
+			strings.Contains(strings.ToLower(log.Error), keyword)
+		if matched == f.KeywordNot {
+			return false
+		}
+	}
 	return (f.Status != "success" || log.Error == "") && (f.Status != "failed" || log.Error != "")
 }
 
@@ -75,10 +87,23 @@ func (f RelayLogFilter) apply(query *gorm.DB) *gorm.DB {
 	if f.ActualModelName != "" {
 		query = query.Where("actual_model_name = ?", f.ActualModelName)
 	}
+	if f.Keyword != "" {
+		pattern := "%" + escapeLikeKeyword(strings.ToLower(f.Keyword)) + "%"
+		condition := "(LOWER(request_content) LIKE ? ESCAPE '\\' OR LOWER(response_content) LIKE ? ESCAPE '\\' OR LOWER(error) LIKE ? ESCAPE '\\')"
+		if f.KeywordNot {
+			query = query.Where("NOT "+condition, pattern, pattern, pattern)
+		} else {
+			query = query.Where(condition, pattern, pattern, pattern)
+		}
+	}
 	if f.Status == "success" {
 		query = query.Where("error = ''")
 	} else if f.Status == "failed" {
 		query = query.Where("error <> ''")
 	}
 	return query
+}
+
+func escapeLikeKeyword(keyword string) string {
+	return strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(keyword)
 }

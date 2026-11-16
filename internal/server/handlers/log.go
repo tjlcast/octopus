@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/server/middleware"
@@ -66,6 +67,7 @@ func parseLogFilters(c *gin.Context) (op.RelayLogFilter, error) {
 	filter := op.RelayLogFilter{
 		RequestModelName: c.Query("request_model_name"),
 		ActualModelName:  c.Query("actual_model_name"),
+		Keyword:          strings.TrimSpace(c.Query("keyword")),
 	}
 
 	var err error
@@ -93,6 +95,13 @@ func parseLogFilters(c *gin.Context) (op.RelayLogFilter, error) {
 	filter.Status = c.Query("status")
 	if filter.Status != "" && filter.Status != "success" && filter.Status != "failed" {
 		return op.RelayLogFilter{}, fmt.Errorf("status must be success or failed")
+	}
+	if keywordNot := c.Query("keyword_not"); keywordNot != "" {
+		value, err := strconv.ParseBool(keywordNot)
+		if err != nil {
+			return op.RelayLogFilter{}, fmt.Errorf("keyword_not must be a boolean")
+		}
+		filter.KeywordNot = value
 	}
 	if err := filter.Validate(); err != nil {
 		return op.RelayLogFilter{}, err

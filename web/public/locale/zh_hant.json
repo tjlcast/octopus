@@ -449,6 +449,9 @@
             "requestModel": "請求模型",
             "actualModel": "實際模型",
             "exactMatch": "精確比對",
+            "keyword": "關鍵字",
+            "keywordHint": "請求、回應或錯誤內容",
+            "keywordNot": "非（不包含關鍵字）",
             "invalidRange": "請輸入有效的非負數，並確保最小值不大於最大值。"
         },
         "list": {
