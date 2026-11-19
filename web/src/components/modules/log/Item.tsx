@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, Download, Network } from 'lucide-react';
+import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, Download, Network, Text } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import JsonView from '@uiw/react-json-view';
@@ -40,6 +40,22 @@ function formatTime(timestamp: number): string {
 function formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function formatTextForClipboard(value: unknown): string {
+    if (typeof value === 'string') {
+        try {
+            return JSON.stringify(JSON.parse(value), null, 2);
+        } catch {
+            return value;
+        }
+    }
+
+    return JSON.stringify(value, null, 2) ?? '';
+}
+
+function formatJsonForClipboard(value: unknown): string {
+    return JSON.stringify(value, null, 2) ?? '';
 }
 
 interface RetryBadgeWithTooltipProps {
@@ -102,6 +118,7 @@ function RetryBadgeWithTooltip({ channelName, brandColor, attempts }: RetryBadge
 
 function DeferredJsonContent({ content, fallbackText }: { content: string | undefined; fallbackText: string }) {
     const { resolvedTheme } = useTheme();
+    const t = useTranslations('log.card');
     const { isOpen } = useMorphingDialog();
     const [shouldRender, setShouldRender] = useState(false);
 
@@ -167,7 +184,31 @@ function DeferredJsonContent({ content, fallbackText }: { content: string | unde
                         displayDataTypes={false}
                         displayObjectSize={false}
                         collapsed={false}
-                    />
+                    >
+                        <JsonView.Copied
+                            render={(_, { value }) => (
+                                <span className="inline-flex items-center gap-1 ml-1">
+                                    <CopyIconButton
+                                        text={formatJsonForClipboard(value)}
+                                        className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                                        copyIconClassName="size-3"
+                                        checkIconClassName="size-3"
+                                        ariaLabel={t('copyJson')}
+                                        title={t('copyJson')}
+                                    />
+                                    <CopyIconButton
+                                        text={formatTextForClipboard(value)}
+                                        className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                                        copyIconClassName="size-3"
+                                        checkIconClassName="size-3"
+                                        copyIcon={Text}
+                                        ariaLabel={t('copyFormattedText')}
+                                        title={t('copyFormattedText')}
+                                    />
+                                </span>
+                            )}
+                        />
+                    </JsonView>
                 </motion.div>
             ) : (
                 <motion.pre

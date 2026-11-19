@@ -475,7 +475,9 @@
             "attempts": "次尝试",
             "success": "成功",
             "failed": "失败",
-            "downloadMessages": "下载消息文件"
+            "downloadMessages": "下载消息文件",
+            "copyJson": "复制 JSON",
+            "copyFormattedText": "复制格式化文本"
         }
     },
     "channel": {

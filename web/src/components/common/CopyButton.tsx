@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, type LucideIcon } from 'lucide-react';
 import { useCopyToClipboard } from '@uidotdev/usehooks';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,9 @@ export type CopyIconButtonProps = {
     className?: string;
     copyIconClassName?: string;
     checkIconClassName?: string;
+    copyIcon?: LucideIcon;
+    ariaLabel?: string;
+    title?: string;
 };
 
 export function CopyIconButton({
@@ -20,6 +23,9 @@ export function CopyIconButton({
     className,
     copyIconClassName,
     checkIconClassName,
+    copyIcon: CopyIcon = Copy,
+    ariaLabel = 'Copy',
+    title,
 }: CopyIconButtonProps) {
     const t = useTranslations('common.copy');
     const [, copyToClipboard] = useCopyToClipboard();
@@ -60,7 +66,8 @@ export function CopyIconButton({
         <button
             type="button"
             onClick={handleClick}
-            aria-label="Copy"
+            aria-label={ariaLabel}
+            title={title}
             className={cn(className)}
         >
             <AnimatePresence mode="wait" initial={false}>
@@ -70,7 +77,7 @@ export function CopyIconButton({
                     </motion.div>
                 ) : (
                     <motion.div key="copy" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                        <Copy className={cn(copyIconClassName)} />
+                        <CopyIcon className={cn(copyIconClassName)} />
                     </motion.div>
                 )}
             </AnimatePresence>

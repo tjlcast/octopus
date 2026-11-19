@@ -475,7 +475,9 @@
             "attempts": "attempts",
             "success": "Success",
             "failed": "Failed",
-            "downloadMessages": "Download Messages"
+            "downloadMessages": "Download Messages",
+            "copyJson": "Copy JSON",
+            "copyFormattedText": "Copy Formatted Text"
         }
     },
     "channel": {
