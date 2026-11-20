@@ -121,6 +121,21 @@ func TestInternalFieldFilterPreservesWhitespaceInConfiguredKeywords(t *testing.T
 	}
 }
 
+func TestInternalFieldFilterFlushesIncompleteKeywordPrefixAtStreamEnd(t *testing.T) {
+	filter := newInternalFieldFilter(true, nil)
+	input := "asdfasdfasd｜｜DSML"
+	var got string
+	for _, stream := range filter.FilterStream(textChunk(0, input)) {
+		got += streamText(stream)
+	}
+	for _, stream := range filter.FilterStream(&model.InternalLLMResponse{Object: "[DONE]"}) {
+		got += streamText(stream)
+	}
+	if got != input {
+		t.Fatalf("incomplete keyword prefix = %q, want %q", got, input)
+	}
+}
+
 func textChunk(index int, text string) *model.InternalLLMResponse {
 	return &model.InternalLLMResponse{
 		Object: "chat.completion.chunk",
