@@ -41,6 +41,8 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         custom_header: channel.custom_header ?? [],
         channel_proxy: channel.channel_proxy ?? '',
         param_override: channel.param_override ?? '',
+        filter_internal_fields: channel.filter_internal_fields,
+        internal_field_filter_keywords: channel.internal_field_filter_keywords || '｜｜DSML｜｜ ',
         keys: channel.keys.length > 0
             ? channel.keys.map((k) => ({
                 id: k.id,
@@ -106,6 +108,16 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         if (nextParamOverride !== curParamOverride) {
             // Empty string means "clear" for patch semantics; backend maps it to NULL.
             req.param_override = nextParamOverride;
+        }
+
+        if (formData.filter_internal_fields !== channel.filter_internal_fields) {
+            req.filter_internal_fields = formData.filter_internal_fields;
+        }
+
+        const nextInternalFieldFilterKeywords = formData.internal_field_filter_keywords;
+        const curInternalFieldFilterKeywords = channel.internal_field_filter_keywords || '｜｜DSML｜｜ ';
+        if (nextInternalFieldFilterKeywords !== curInternalFieldFilterKeywords) {
+            req.internal_field_filter_keywords = nextInternalFieldFilterKeywords;
         }
 
         const nextMatchRegex = formData.match_regex.trim();

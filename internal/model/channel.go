@@ -29,9 +29,13 @@ type Channel struct {
 	AutoGroup     AutoGroupType         `json:"auto_group" gorm:"default:0"`
 	CustomHeader  []CustomHeader        `json:"custom_header" gorm:"serializer:json"`
 	ParamOverride *string               `json:"param_override"`
-	ChannelProxy  *string               `json:"channel_proxy"`
-	Stats         *StatsChannel         `json:"stats,omitempty" gorm:"foreignKey:ChannelID"`
-	MatchRegex    *string               `json:"match_regex"`
+	// FilterInternalFields removes known provider-internal response blocks before
+	// they are returned to the caller. It is disabled by default for backwards compatibility.
+	FilterInternalFields        bool          `json:"filter_internal_fields" gorm:"default:false"`
+	InternalFieldFilterKeywords *string       `json:"internal_field_filter_keywords"`
+	ChannelProxy                *string       `json:"channel_proxy"`
+	Stats                       *StatsChannel `json:"stats,omitempty" gorm:"foreignKey:ChannelID"`
+	MatchRegex                  *string       `json:"match_regex"`
 }
 
 type BaseUrl struct {
@@ -57,20 +61,22 @@ type ChannelKey struct {
 
 // ChannelUpdateRequest 渠道更新请求 - 仅包含变更的数据
 type ChannelUpdateRequest struct {
-	ID            int                    `json:"id" binding:"required"`
-	Name          *string                `json:"name,omitempty"`
-	Type          *outbound.OutboundType `json:"type,omitempty"`
-	Enabled       *bool                  `json:"enabled,omitempty"`
-	BaseUrls      *[]BaseUrl             `json:"base_urls,omitempty"`
-	Model         *string                `json:"model,omitempty"`
-	CustomModel   *string                `json:"custom_model,omitempty"`
-	Proxy         *bool                  `json:"proxy,omitempty"`
-	AutoSync      *bool                  `json:"auto_sync,omitempty"`
-	AutoGroup     *AutoGroupType         `json:"auto_group,omitempty"`
-	CustomHeader  *[]CustomHeader        `json:"custom_header,omitempty"`
-	ChannelProxy  *string                `json:"channel_proxy,omitempty"`
-	ParamOverride *string                `json:"param_override,omitempty"`
-	MatchRegex    *string                `json:"match_regex,omitempty"`
+	ID                          int                    `json:"id" binding:"required"`
+	Name                        *string                `json:"name,omitempty"`
+	Type                        *outbound.OutboundType `json:"type,omitempty"`
+	Enabled                     *bool                  `json:"enabled,omitempty"`
+	BaseUrls                    *[]BaseUrl             `json:"base_urls,omitempty"`
+	Model                       *string                `json:"model,omitempty"`
+	CustomModel                 *string                `json:"custom_model,omitempty"`
+	Proxy                       *bool                  `json:"proxy,omitempty"`
+	AutoSync                    *bool                  `json:"auto_sync,omitempty"`
+	AutoGroup                   *AutoGroupType         `json:"auto_group,omitempty"`
+	CustomHeader                *[]CustomHeader        `json:"custom_header,omitempty"`
+	ChannelProxy                *string                `json:"channel_proxy,omitempty"`
+	ParamOverride               *string                `json:"param_override,omitempty"`
+	FilterInternalFields        *bool                  `json:"filter_internal_fields,omitempty"`
+	InternalFieldFilterKeywords *string                `json:"internal_field_filter_keywords,omitempty"`
+	MatchRegex                  *string                `json:"match_regex,omitempty"`
 
 	KeysToAdd    []ChannelKeyAddRequest    `json:"keys_to_add,omitempty"`
 	KeysToUpdate []ChannelKeyUpdateRequest `json:"keys_to_update,omitempty"`
