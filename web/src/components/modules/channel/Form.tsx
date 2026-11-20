@@ -32,6 +32,8 @@ export interface ChannelFormData {
     custom_header: Channel['custom_header'];
     channel_proxy: string;
     param_override: string;
+    filter_internal_fields: boolean;
+    internal_field_filter_keywords: string;
     keys: ChannelKeyFormItem[];
     model: string;
     custom_model: string;
@@ -546,6 +548,34 @@ export function ChannelForm({
                                     </div>
                                 ))}
                             </div>
+                        </div>
+
+                        <div className="flex items-start justify-between gap-4 rounded-xl border border-border/60 p-3">
+                            <div className="space-y-1">
+                                <label htmlFor={`${idPrefix}-filter-internal-fields`} className="text-sm font-medium text-card-foreground">
+                                    {t('filterInternalFields')}
+                                </label>
+                                <p className="text-xs text-muted-foreground">{t('filterInternalFieldsHint')}</p>
+                            </div>
+                            <Switch
+                                id={`${idPrefix}-filter-internal-fields`}
+                                checked={formData.filter_internal_fields}
+                                onCheckedChange={(checked) => onFormDataChange({ ...formData, filter_internal_fields: checked })}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label htmlFor={`${idPrefix}-internal-field-filter-keywords`} className="text-sm font-medium text-card-foreground">
+                                {t('internalFieldFilterKeywords')}
+                            </label>
+                            <textarea
+                                id={`${idPrefix}-internal-field-filter-keywords`}
+                                value={formData.internal_field_filter_keywords}
+                                onChange={(e) => onFormDataChange({ ...formData, internal_field_filter_keywords: e.target.value })}
+                                placeholder={t('internalFieldFilterKeywordsPlaceholder')}
+                                className="min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                            <p className="text-xs text-muted-foreground">{t('internalFieldFilterKeywordsHint')}</p>
                         </div>
 
                         <div className="space-y-2">

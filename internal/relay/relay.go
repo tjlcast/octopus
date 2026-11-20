@@ -137,6 +137,7 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			channel:              channel,
 			usedKey:              usedKey,
 			firstTokenTimeOutSec: group.FirstTokenTimeOut,
+			internalFieldFilter:  newInternalFieldFilter(channel.FilterInternalFields, channel.InternalFieldFilterKeywords),
 		}
 
 		result := ra.attempt()
@@ -414,14 +415,16 @@ func (ra *relayAttempt) handleStreamResponse(ctx context.Context, response *http
 				}
 			}
 
-			ra.c.Writer.Write(data)
-			ra.c.Writer.Flush()
+			for _, part := range data {
+				ra.c.Writer.Write(part)
+				ra.c.Writer.Flush()
+			}
 		}
 	}
 }
 
 // transformStreamData 转换流式数据
-func (ra *relayAttempt) transformStreamData(ctx context.Context, data string) ([]byte, error) {
+func (ra *relayAttempt) transformStreamData(ctx context.Context, data string) ([][]byte, error) {
 	internalStream, err := ra.outAdapter.TransformStream(ctx, []byte(data))
 	if err != nil {
 		log.Warnf("failed to transform stream: %v", err)
@@ -431,13 +434,23 @@ func (ra *relayAttempt) transformStreamData(ctx context.Context, data string) ([
 		return nil, nil
 	}
 
-	inStream, err := ra.inAdapter.TransformStream(ctx, internalStream)
-	if err != nil {
-		log.Warnf("failed to transform stream: %v", err)
-		return nil, err
+	internalStreams := []*model.InternalLLMResponse{internalStream}
+	if ra.internalFieldFilter != nil {
+		internalStreams = ra.internalFieldFilter.FilterStream(internalStream)
 	}
 
-	return inStream, nil
+	result := make([][]byte, 0, len(internalStreams))
+	for _, stream := range internalStreams {
+		inStream, err := ra.inAdapter.TransformStream(ctx, stream)
+		if err != nil {
+			log.Warnf("failed to transform stream: %v", err)
+			return nil, err
+		}
+		if len(inStream) > 0 {
+			result = append(result, inStream)
+		}
+	}
+	return result, nil
 }
 
 // handleResponse 处理非流式响应
@@ -446,6 +459,9 @@ func (ra *relayAttempt) handleResponse(ctx context.Context, response *http.Respo
 	if err != nil {
 		log.Warnf("failed to transform response: %v", err)
 		return fmt.Errorf("failed to transform outbound response: %w", err)
+	}
+	if ra.internalFieldFilter != nil {
+		ra.internalFieldFilter.FilterResponse(internalResponse)
 	}
 
 	inResponse, err := ra.inAdapter.TransformResponse(ctx, internalResponse)

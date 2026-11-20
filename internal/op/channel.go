@@ -173,6 +173,14 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 		selectFields = append(selectFields, "param_override")
 		updates.ParamOverride = req.ParamOverride
 	}
+	if req.FilterInternalFields != nil {
+		selectFields = append(selectFields, "filter_internal_fields")
+		updates.FilterInternalFields = *req.FilterInternalFields
+	}
+	if req.InternalFieldFilterKeywords != nil {
+		selectFields = append(selectFields, "internal_field_filter_keywords")
+		updates.InternalFieldFilterKeywords = req.InternalFieldFilterKeywords
+	}
 	if req.MatchRegex != nil {
 		selectFields = append(selectFields, "match_regex")
 		updates.MatchRegex = req.MatchRegex
